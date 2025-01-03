@@ -1,26 +1,17 @@
 import select
 import socket
 
-import dns.query
-import dns.rdataclass
-import dns.rdatatype
 import more_itertools
 
 from dns_tunnel.protocol import (
     DNSPacket,
-    DNSPacketHeader,
-    MessageType,
-    convert_data_to_tunnel_messages,
     create_ack_message,
-    send_custom_dns_query,
+    send_custom_dns_query, MessageType,
 )
 from dns_tunnel.selectables.proxy_socket import ProxySocket
-from dns_tunnel.selectables.selectable_socket import ClientStates, SelectableSocket
 from dns_tunnel.selectables.tcp_client_socket import (
     TCPClientSocket,
-    TCPClientSocketState,
 )
-from dns_tunnel.selectables.tunnel_socket import TunnelSocket, TunnelSocketState
 
 
 ## client -> serve
@@ -57,8 +48,6 @@ class ClientHandler:
         self._rlist = []
         self._wlist = []
         self._clients: list[TCPClientSocket] = []
-
-        self._tcp_client_to_tunnel: dict[TCPClientSocket, TunnelSocket] = {}
         self._session_id_counter = 0
 
     def run(self):
@@ -101,8 +90,12 @@ class ClientHandler:
                 msgs = proxy_socket.read()
                 for msg in msgs:
                     client = self._get_client_by_session_id(msg.header.session_id)
+                    if msg.header.message_type == MessageType.ACK_MESSAGE:
+                        proxy_socket.ack_message(msg.header.session_id, msg.header.sequence_number)
+                        continue
+                    # TODO: check if it is the expected sequence
                     proxy_socket.add_to_write_queue(
-                        create_ack_message(msg.header.session_id, msg.header.sequence_number)
+                        create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes()
                     )
                     client.add_to_write_queue(msg.payload)
 
@@ -176,14 +169,6 @@ class ClientHandler:
         for client in self._clients:
             if client.session_id == sessoin_id:
                 return client
-
-    @property
-    def tcp_client_to_tunnel(self) -> dict[TCPClientSocket, TunnelSocket]:
-        return self._tcp_client_to_tunnel
-
-    @property
-    def tunnel_to_tcp_client(self) -> dict[TunnelSocket, TCPClientSocket]:
-        return {tunnel: tcp_client for tcp_client, tunnel in self.tcp_client_to_tunnel.items()}
 
 
 def main():

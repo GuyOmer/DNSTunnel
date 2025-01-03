@@ -40,12 +40,12 @@ class DNSPacketHeader:
     _HEADER_FMT = "!IIIII"  # TODO: make sure this is correct
     _FORMATTER = struct.Struct(_HEADER_FMT)
 
-    MAGIC: Final = b"deadbeaf"  # TODO: Make sure this makes sense
-
     payload_length: int
     message_type: MessageType
     session_id: int
     sequence_number: int
+
+    MAGIC: Final = b"deadbeaf"  # TODO: Make sure this makes sense
 
     def to_bytes(self) -> bytes:
         return type(self)._FORMATTER.pack(
@@ -82,12 +82,12 @@ class DNSPacketHeader:
 
 @dataclasses.dataclass(frozen=True)
 class DNSPacket:
+    header: DNSPacketHeader
+    payload: bytes
+
     MAX_PAYLOAD: Final = (
         255  # TODO make sure this is really max UDP packet size (within MTU...) (also take into account the header size)
     )
-
-    header: DNSPacketHeader
-    payload: bytes
 
     def to_bytes(self) -> bytes:
         return self.header.to_bytes() + self.payload

@@ -40,21 +40,21 @@ class SelectableSocket:
         data = self._s.recv(2**10)
         if len(data) == 0:
             # TODO: This means the socket closed?
-            return None
+            return []
 
         self._read_buf += data
 
         msgs = []
         while self._read_buf:
             try:
-                msg = DNSPacket.from_bytes(data)
+                msg = DNSPacket.from_bytes(self._read_buf)
                 msgs.append(msg)
 
                 # Consume read bytes from buffer
-                data = data[len(msg) :]
+                self._read_buf = self._read_buf[len(msg):]
             except InvalidSocketBuffer:
                 logger.debug("Invalid starting bytes in buffer, flushing them")
-                self._read_buf = self._read_buf[DNSPacketHeader.MAGIC :]
+                self._read_buf = self._read_buf[self._read_buf.index(DNSPacketHeader.MAGIC):] if DNSPacketHeader.MAGIC in self._read_buf else b""
                 continue
             except (PartialHeaderError, NotEnoughDataError):
                 logger.debug("Not enough data in buffer")

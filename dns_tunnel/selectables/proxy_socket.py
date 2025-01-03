@@ -1,7 +1,6 @@
 import collections
 import dataclasses
 import datetime
-import random
 from typing import Final
 
 from dns_tunnel.protocol import DNSPacket
@@ -36,32 +35,30 @@ class ProxySocket(SelectableSocket):
 
     def write(self):
         pending_send = [session for session in self._sessions.values() if session.sending_queue]
+        for session in pending_send:
+            # Last message was acked, can send the next one
+            if session.last_sent_seq == session.last_acked_seq:
+                msg_to_send = session.sending_queue[0]
 
-        chosen_to_send = random.choice(pending_send)
-        # msg_to_send = more_itertools.first(chosen_to_send.sending_queue)
-
-        # Last message was acked, can send the next one
-        if chosen_to_send.last_sent_seq == chosen_to_send.last_acked_seq:
-            msg_to_send = chosen_to_send.sending_queue[0]
-
-        # Last message wasnt acked, check if we need to retransmit it)
-        elif chosen_to_send.last_sending_time + RETRANSMISSOIN_TIME > datetime.datetime.now():
-            # If too many retransmission attempts, quit
-            if chosen_to_send.retransission_attempt_counter > MAX_RETRANSSMISSION_ATTEMPTS:
-                raise RuntimeError()
+            # Last message wasnt acked, check if we need to retransmit it)
+            elif session.last_sending_time + RETRANSMISSOIN_TIME > datetime.datetime.now():
+                # If too many retransmission attempts, quit
+                if session.retransission_attempt_counter > MAX_RETRANSSMISSION_ATTEMPTS:
+                    raise RuntimeError()
+                else:
+                    msg_to_send = session.sending_queue[0]
+                    session.retransission_attempt_counter += 1
+            # Not acked, but no need to retranssmit
             else:
-                msg_to_send = chosen_to_send.sending_queue[0]
-                chosen_to_send.retransission_attempt_counter += 1
-        # Not acked, but no need to retranssmit
-        else:
-            return
+                continue
 
-        bytes_sent = self._s.write(msg_to_send.serialize())
-        if bytes_sent != msg_to_send.size():
-            # In packet fragmentation is not supported
-            raise RuntimeError()
+            bytes_sent = self._s.send(msg_to_send.to_bytes())
+            if bytes_sent != msg_to_send.size():
+                # In packet fragmentation is not supported
+                raise RuntimeError()
 
-        chosen_to_send.last_sent_seq = msg_to_send.sequence_number
-        chosen_to_send.last_sending_time = datetime.datetime.now()
+            session.last_sent_seq = msg_to_send.header.sequence_number
+            session.last_sending_time = datetime.datetime.now()
 
-    def ack_message(self, session_id: int, sequence_number: int): ...
+    def ack_message(self, session_id: int, sequence_number: int):
+        self._sessions[session_id].last_acked_seq = max(self._sessions[session_id].last_acked_seq, sequence_number)
