@@ -3,44 +3,37 @@ import socket
 
 import more_itertools
 
-from dns_tunnel.protocol import (
-    DNSPacket,
-    create_ack_message,
-    send_custom_dns_query, MessageType,
-)
+from dns_tunnel.protocol import DNSPacket, MessageType, create_ack_message
 from dns_tunnel.selectables.proxy_socket import ProxySocket
-from dns_tunnel.selectables.tcp_client_socket import (
-    TCPClientSocket,
-)
-
+from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 
 ## client -> serve
 # https://medium.com/@nimit95/socks-5-a-proxy-protocol-b741d3bec66c
-def perform_socks5_handshake(server_ip: str, domain_name: str, socks_server_ip: str, socks_server_port: int) -> None:
-    """
-    Performs a SOCKS5 handshake using DNS queries to send the handshake payload.
+# def perform_socks5_handshake(server_ip: str, domain_name: str, socks_server_ip: str, socks_server_port: int) -> None:
+#     """
+#     Performs a SOCKS5 handshake using DNS queries to send the handshake payload.
 
-    :param server_ip: The IP address of the DNS server (e.g., '8.8.8.8').
-    :param domain_name: The domain name to query.
-    :param socks_server_ip: The IP address of the SOCKS5 server.
-    :param socks_server_port: The port of the SOCKS5 server.
-    """
+#     :param server_ip: The IP address of the DNS server (e.g., '8.8.8.8').
+#     :param domain_name: The domain name to query.
+#     :param socks_server_ip: The IP address of the SOCKS5 server.
+#     :param socks_server_port: The port of the SOCKS5 server.
+#     """
 
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.bind(("0.0.0.0", 13132))
-        print("Waiting for SOCKS5 responses...")
+#     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+#         sock.bind(("0.0.0.0", 13132))
+#         print("Waiting for SOCKS5 responses...")
 
-        # Receive and validate greeting response
-        data, _ = sock.recvfrom(2)
-    # SOCKS5 greeting (version 5, 1 authentication method, no authentication)
-    greeting = bytes([0x05, 0x01, 0x00])
-    send_custom_dns_query(server_ip, domain_name, greeting)
+#         # Receive and validate greeting response
+#         data, _ = sock.recvfrom(2)
+#     # SOCKS5 greeting (version 5, 1 authentication method, no authentication)
+#     greeting = bytes([0x05, 0x01, 0x00])
+#     send_custom_dns_query(server_ip, domain_name, greeting)
 
-    # SOCKS5 connection request (version 5, connect command, reserved, address type IPv4, target IP and port)
-    address_bytes = bytes(map(int, socks_server_ip.split(".")))
-    port_bytes = socks_server_port.to_bytes(2, "big")
-    connection_request = bytes([0x05, 0x01, 0x00, 0x01]) + address_bytes + port_bytes
-    send_custom_dns_query(server_ip, domain_name, connection_request)
+#     # SOCKS5 connection request (version 5, connect command, reserved, address type IPv4, target IP and port)
+#     address_bytes = bytes(map(int, socks_server_ip.split(".")))
+#     port_bytes = socks_server_port.to_bytes(2, "big")
+#     connection_request = bytes([0x05, 0x01, 0x00, 0x01]) + address_bytes + port_bytes
+#     send_custom_dns_query(server_ip, domain_name, connection_request)
 
 
 class ClientHandler:

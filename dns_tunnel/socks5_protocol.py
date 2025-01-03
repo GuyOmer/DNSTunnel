@@ -40,6 +40,14 @@ class SOCKS5AddressType(enum.IntEnum):
 @enum.unique
 class SOCKS5ConnectRequestStatus(enum.IntEnum):
     GRANTED = 0x00
+    GENERAL_FAILURE = 0x01
+    CONNECTION_NOT_ALLOWED_BY_RULESET = 0x02
+    NETWORK_UNREACHABLE = 0x03
+    HOST_UNREACHABLE = 0x04
+    CONNECTION_REFUSED_BY_DESTINATION_HOST = 0x05
+    TTL_EXPIRED = 0x06
+    COMMAND_NOT_SUPPORTED = 0x07
+    ADDRESS_TYPE_NOT_SUPPORTED = 0x08
 
 
 SOCKS5_VERSION: Final = 5
@@ -54,6 +62,7 @@ class SOCKS5MessagePartFormat(enum.StrEnum):
     ADDRESS_TYPE = "B"
     IPV4_HOST = "4B"
     PORT = "H"
+    STATUS = "B"
 
 
 @dataclasses.dataclass
@@ -162,12 +171,24 @@ class SOCKS5IPv4ConnectRequest(SOCKS5Message):
         )
 
 
-# TODO: Understand this one
 @dataclasses.dataclass
 class SOCKS5IPv4ConnectResponse(SOCKS5Message):
-    status: SOCKS5ConnectRequestStatus
+    status: SOCKS5ConnectRequestStatus  # Also known as reply
+    host: str
+    port: int
 
-    _FORMAT: Final = "!"
+    address_type: Final = SOCKS5AddressType.IP_V4
+
+    _FORMAT: Final = "!" + "".join(
+        [
+            SOCKS5MessagePartFormat.VERSION,
+            SOCKS5MessagePartFormat.STATUS,
+            SOCKS5MessagePartFormat.RESERVED,
+            SOCKS5MessagePartFormat.ADDRESS_TYPE,
+            SOCKS5MessagePartFormat.IPV4_HOST,
+            SOCKS5MessagePartFormat.PORT,
+        ]
+    )
 
     def to_bytes(self) -> bytes:
         return struct.pack(
@@ -177,5 +198,22 @@ class SOCKS5IPv4ConnectResponse(SOCKS5Message):
             0,  # Reserved
             self.address_type,
             self.host,
+            *map(int, self.host.split(".")),  # TODO: Should this be a list, or unpacking
             self.port,
+        )
+
+    @classmethod
+    def from_bytes(cls, data):
+
+        super().from_bytes(data)
+
+        _, status, __, raw_address_type, host, port = struct.unpack(cls._FORMAT, data)
+
+        if raw_address_type != SOCKS5AddressType.IP_V4:
+            raise ValueError(f"Unsupported address type in SOCKS5 request: {raw_address_type}")
+
+        return cls(
+            SOCKS5ConnectRequestStatus(status),
+            host,
+            port,
         )
