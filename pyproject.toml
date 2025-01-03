@@ -1,0 +1,10 @@
+[tool.pylint]
+disable = [
+    "logging-fstring-interpolation",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "missing-class-docstring"
+]
+
+[tool.black]
+line-length=120
