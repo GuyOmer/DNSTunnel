@@ -3,7 +3,7 @@ import dataclasses
 import datetime
 from typing import Final
 
-from dns_tunnel.protocol import DNSPacket
+from dns_tunnel.protocol import DNSPacket, DNSPacketHeader, MessageType
 from dns_tunnel.selectables.selectable_socket import SelectableSocket
 
 
@@ -14,11 +14,11 @@ class SessionInfo:
     last_sent_seq: int = 0
     last_acked_seq: int = -1
     last_sending_time: datetime = 0
-    retransission_attempt_counter = 0
+    retransmission_attempt_counter = 0
 
 
-RETRANSMISSOIN_TIME: Final = datetime.timedelta(seconds=10)
-MAX_RETRANSSMISSION_ATTEMPTS: Final = 3
+RETRANSMISSION_TIME: Final = datetime.timedelta(seconds=10)
+MAX_RETRANSMISSION_ATTEMPTS: Final = 3
 
 
 class ProxySocket(SelectableSocket):
@@ -30,7 +30,8 @@ class ProxySocket(SelectableSocket):
 
     def queue_to_session(self, payload: bytes, session_id: int):
         session = self._sessions[session_id]
-        session.sending_queue.append(DNSPacket(..., session_id, session.seq_counter, payload))
+        session.sending_queue.append(
+            DNSPacket(DNSPacketHeader(len(payload), MessageType.NORMAL_MESSAGE, session_id, session.seq_counter), payload))
         session.seq_counter += 1
 
     def write(self):
@@ -41,19 +42,19 @@ class ProxySocket(SelectableSocket):
                 msg_to_send = session.sending_queue[0]
 
             # Last message wasnt acked, check if we need to retransmit it)
-            elif session.last_sending_time + RETRANSMISSOIN_TIME > datetime.datetime.now():
+            elif session.last_sending_time + RETRANSMISSION_TIME > datetime.datetime.now():
                 # If too many retransmission attempts, quit
-                if session.retransission_attempt_counter > MAX_RETRANSSMISSION_ATTEMPTS:
+                if session.retransmission_attempt_counter > MAX_RETRANSMISSION_ATTEMPTS:
                     raise RuntimeError()
                 else:
                     msg_to_send = session.sending_queue[0]
-                    session.retransission_attempt_counter += 1
-            # Not acked, but no need to retranssmit
+                    session.retransmission_attempt_counter += 1
+            # Not acked, but no need to retransmit yet
             else:
                 continue
 
             bytes_sent = self._s.send(msg_to_send.to_bytes())
-            if bytes_sent != msg_to_send.size():
+            if bytes_sent != len(msg_to_send):
                 # In packet fragmentation is not supported
                 raise RuntimeError()
 
@@ -61,4 +62,6 @@ class ProxySocket(SelectableSocket):
             session.last_sending_time = datetime.datetime.now()
 
     def ack_message(self, session_id: int, sequence_number: int):
-        self._sessions[session_id].last_acked_seq = max(self._sessions[session_id].last_acked_seq, sequence_number)
+        if sequence_number > self._sessions[session_id].last_acked_seq:
+            self._sessions[session_id].last_acked_seq = sequence_number
+            self._sessions[session_id].sending_queue.pop(0)

@@ -13,11 +13,7 @@ import more_itertools
 
 @enum.unique
 class MessageType(enum.Enum):
-    SOCKS_GREETING = 1
-    SOCKS_GREETING_RESPONSE = 2
-    SOCKS_CONNECTION_REQUEST = 3
-    SOCKS_CONNECTION_RESPONSE = 4
-
+    NORMAL_MESSAGE = 1
     ACK_MESSAGE = 10
 
 
