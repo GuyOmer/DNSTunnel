@@ -18,6 +18,7 @@ class ClientHandler:
     def run(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.bind(("0.0.0.0", 1080))
+        server_socket.listen(5)
 
         ingress_socket = ProxySocket(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
         self._rlist = [server_socket]  # On startup - only listen for new server clients

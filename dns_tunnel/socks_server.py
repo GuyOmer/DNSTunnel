@@ -106,3 +106,7 @@ class ProxyServerHandler:
             # proxy tunnel already setup, just forward messages
             destination = self._session_id_to_destination[msg.header.session_id]
             destination.add_to_write_queue(msg.payload)
+
+
+if __name__ == "__main__":
+    ProxyServerHandler().run()

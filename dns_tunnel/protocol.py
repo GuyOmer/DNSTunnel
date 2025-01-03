@@ -37,13 +37,13 @@ class NotEnoughDataError(DNSPacketError): ...
 
 @dataclasses.dataclass
 class DNSPacketHeader:
-    _HEADER_FMT = "!IIIII"  # TODO: make sure this is correct
-    _FORMATTER = struct.Struct(_HEADER_FMT)
-
     payload_length: int
     message_type: MessageType
     session_id: int
     sequence_number: int
+
+    _HEADER_FMT = "!IIIII"  # TODO: make sure this is correct
+    _FORMATTER = struct.Struct(_HEADER_FMT)
 
     MAGIC: Final = b"deadbeaf"  # TODO: Make sure this makes sense
 
@@ -59,15 +59,11 @@ class DNSPacketHeader:
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
         if len(data) < cls._FORMATTER.size:
-            raise PartialHeaderError(
-                f"Only {len(data)} bytes are aviliable, expected {cls._FORMATTER.size}"
-            )
+            raise PartialHeaderError(f"Only {len(data)} bytes are aviliable, expected {cls._FORMATTER.size}")
 
         if not data.startswith(cls.MAGIC):
             # data is long enough to contain the magic, but doesn't contain it
-            raise InvalidSocketBuffer(
-                f"Buffer starts with '{data[:len(cls.MAGIC)]}', are expected '{cls.MAGIC}'"
-            )
+            raise InvalidSocketBuffer(f"Buffer starts with '{data[:len(cls.MAGIC)]}', are expected '{cls.MAGIC}'")
 
         return cls(
             *cls._FORMATTER.unpack(

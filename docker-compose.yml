@@ -1,0 +1,55 @@
+services:
+  test-endpoint:
+    image: nginx:alpine
+    networks: 
+      endpoint-net:  # Private network, not accessible from outside
+    volumes:
+      - ./test-endpoint/html:/usr/share/nginx/html:ro
+      - ./test-endpoint/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./test-endpoint/certs:/etc/nginx/certs:ro
+    expose:
+      - "443"
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  dns-server:
+    build:
+      context: .
+      dockerfile: server_Dockerfile
+    ports:
+      - "53:53/udp"
+    networks:
+      - proxy-net
+      - endpoint-net  # Can access the test endpoint
+    # volumes:
+    #   - ./server:/app/server
+    #   - ./shared:/app/shared
+    environment:
+      - PYTHONUNBUFFERED=1
+    # command: python -u server/server.py
+
+  client:
+    build:
+      context: .
+      dockerfile: client_Dockerfile
+    ports:
+      # - "${PROXY_PORT:-1080}:1080"
+      - "1080:1080"
+    networks:
+      - proxy-net  # Can only access dns-server
+    # volumes:
+    #   - ./client:/app/client
+    #   - ./shared:/app/shared
+    environment:
+      - PYTHONUNBUFFERED=1
+    # command: python -u client/client.py
+    depends_on:
+      - dns-server
+      - test-endpoint
+
+networks:
+  proxy-net:
+    driver: bridge
+  endpoint-net:  # Private network for test endpoint
+    driver: bridge
+    internal: true  # Makes this network internal only

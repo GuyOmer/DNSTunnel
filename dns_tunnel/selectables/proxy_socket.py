@@ -9,7 +9,7 @@ from dns_tunnel.selectables.selectable_socket import SelectableSocket
 
 @dataclasses.dataclass
 class SessionInfo:
-    sending_queue: list[DNSPacket] = []
+    sending_queue: list[DNSPacket] = dataclasses.field(default_factory=list)
     seq_counter: int = 0
     last_sent_seq: int = 0
     last_acked_seq: int = -1

@@ -27,7 +27,7 @@ class SelectableSocket:
         self._write_buffer += data
 
     def needs_to_write(self) -> bool:
-        return len(self._write_buffer) == 0
+        return len(self._write_buffer) != 0
 
     def write(self) -> int:
         bytes_sent = self._s.send(self._write_buffer)
@@ -51,10 +51,14 @@ class SelectableSocket:
                 msgs.append(msg)
 
                 # Consume read bytes from buffer
-                self._read_buf = self._read_buf[len(msg):]
+                self._read_buf = self._read_buf[len(msg) :]
             except InvalidSocketBuffer:
                 logger.debug("Invalid starting bytes in buffer, flushing them")
-                self._read_buf = self._read_buf[self._read_buf.index(DNSPacketHeader.MAGIC):] if DNSPacketHeader.MAGIC in self._read_buf else b""
+                self._read_buf = (
+                    self._read_buf[self._read_buf.index(DNSPacketHeader.MAGIC) :]
+                    if DNSPacketHeader.MAGIC in self._read_buf
+                    else b""
+                )
                 continue
             except (PartialHeaderError, NotEnoughDataError):
                 logger.debug("Not enough data in buffer")
