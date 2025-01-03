@@ -4,7 +4,7 @@ import socket
 
 import more_itertools
 
-from dns_tunnel.protocol import DNSPacket, create_ack_message
+from dns_tunnel.protocol import DNSPacket, create_ack_message, MessageType
 from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks5_protocol import (
@@ -30,37 +30,41 @@ class ProxyServerHandler:
         self._destinations: list[TCPClientSocket] = []
 
         self._session_id_to_destination: dict[int, TCPClientSocket] = {}
-        self._session_id_to_socks5_handshake_state: dict[int, SOCKS5HandshakeState]
+        self._session_id_to_socks5_handshake_state: dict[int, SOCKS5HandshakeState] = {}
 
     def run(self):
-        ingress = ProxySocket(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
-        self._rlist.append(ingress)
+        ingress_socket = ProxySocket(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+        self._rlist.append(ingress_socket)
 
         while True:
             r_ready, w_ready, _ = select.select(self._rlist, self._wlist, [])
 
-            if ingress in r_ready:
-                msgs = ingress.read()
+            if ingress_socket in r_ready:
+                msgs = ingress_socket.read()
 
                 for msg in msgs:
-                    self._handle_incoming_ingress_message(ingress, msg)
+                    self._handle_incoming_ingress_message(ingress_socket, msg)
 
             for dest in [r for r in r_ready if r in self._destinations]:
                 data = dest.read()  # TODO: Need to be real TCP read
                 for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
-                    ingress.queue_to_session(chunk, dest.session_id)
+                    ingress_socket.queue_to_session(chunk, dest.session_id)
 
             for w in w_ready:
                 if isinstance(w, (ProxySocket, TCPClientSocket)):
                     w.write()
 
     def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
+        if msg.header.message_type == MessageType.ACK_MESSAGE:
+            ingress.ack_message(msg.header.session_id, msg.header.sequence_number)
+            return
+
         # Add ack to send queue
         ingress.add_to_write_queue(
             create_ack_message(
                 msg.header.session_id,
                 msg.header.sequence_number,
-            )
+            ).to_bytes()
         )
 
         # Handle the message
@@ -89,7 +93,7 @@ class ProxyServerHandler:
 
                         dest_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         dest_sock.connect((command_msg.host, command_msg.port))  # TODO: might this block?
-                        destination = TCPClientSocket(dest_sock, msg.header.session_id)
+                        self._session_id_to_destination[msg.header.session_id] = TCPClientSocket(dest_sock, msg.header.session_id)
                         ingress.add_to_write_queue(
                             SOCKS5IPv4ConnectResponse(
                                 SOCKS5ConnectRequestStatus.GRANTED, command_msg.host, command_msg.port
