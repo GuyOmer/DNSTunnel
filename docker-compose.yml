@@ -33,7 +33,8 @@ services:
       context: .
       dockerfile: client_Dockerfile
     ports:
-      - "${PROXY_PORT:-1080}:1080"
+      # - "${PROXY_PORT:-1080}:1080"
+      - "1080:1080"
     networks:
       - proxy-net  # Can only access dns-server
     # volumes:
