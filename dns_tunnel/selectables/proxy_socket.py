@@ -31,15 +31,11 @@ class ProxySocket(SelectableSocket):
 
     def queue_to_session(self, payload: bytes, session_id: int):
         session = self._sessions[session_id]
-        session.sending_queue.append(
-            DNSPacket(..., session_id, session.seq_counter, payload)
-        )
+        session.sending_queue.append(DNSPacket(..., session_id, session.seq_counter, payload))
         session.seq_counter += 1
 
     def write(self):
-        pending_send = [
-            session for session in self._sessions.values() if session.sending_queue
-        ]
+        pending_send = [session for session in self._sessions.values() if session.sending_queue]
 
         chosen_to_send = random.choice(pending_send)
         # msg_to_send = more_itertools.first(chosen_to_send.sending_queue)
@@ -49,15 +45,9 @@ class ProxySocket(SelectableSocket):
             msg_to_send = chosen_to_send.sending_queue[0]
 
         # Last message wasnt acked, check if we need to retransmit it)
-        elif (
-            chosen_to_send.last_sending_time + RETRANSMISSOIN_TIME
-            > datetime.datetime.now()
-        ):
+        elif chosen_to_send.last_sending_time + RETRANSMISSOIN_TIME > datetime.datetime.now():
             # If too many retransmission attempts, quit
-            if (
-                chosen_to_send.retransission_attempt_counter
-                > MAX_RETRANSSMISSION_ATTEMPTS
-            ):
+            if chosen_to_send.retransission_attempt_counter > MAX_RETRANSSMISSION_ATTEMPTS:
                 raise RuntimeError()
             else:
                 msg_to_send = chosen_to_send.sending_queue[0]
@@ -74,4 +64,4 @@ class ProxySocket(SelectableSocket):
         chosen_to_send.last_sent_seq = msg_to_send.sequence_number
         chosen_to_send.last_sending_time = datetime.datetime.now()
 
-    def ack_messge(self, session_id: int, sequence_number: int): ...
+    def ack_message(self, session_id: int, sequence_number: int): ...
