@@ -38,16 +38,15 @@ class DNSPacketHeader:
     session_id: int
     sequence_number: int
 
-    _HEADER_FMT = "!IIIII"  # TODO: make sure this is correct
-    _FORMATTER = struct.Struct(_HEADER_FMT)
-
     MAGIC: Final = b"deadbeaf"  # TODO: Make sure this makes sense
+    _HEADER_FMT = f"!{len(MAGIC)}bIBBI"  # TODO: make sure this is correct
+    _FORMATTER = struct.Struct(_HEADER_FMT)
 
     def to_bytes(self) -> bytes:
         return type(self)._FORMATTER.pack(
-            type(self).MAGIC,
+            *type(self).MAGIC,
             self.payload_length,
-            int(self.message_type),
+            self.message_type.value,
             self.session_id,
             self.sequence_number,
         )
@@ -55,7 +54,7 @@ class DNSPacketHeader:
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
         if len(data) < cls._FORMATTER.size:
-            raise PartialHeaderError(f"Only {len(data)} bytes are aviliable, expected {cls._FORMATTER.size}")
+            raise PartialHeaderError(f"Only {len(data)} bytes are available, expected {cls._FORMATTER.size}")
 
         if not data.startswith(cls.MAGIC):
             # data is long enough to contain the magic, but doesn't contain it
@@ -63,7 +62,7 @@ class DNSPacketHeader:
 
         return cls(
             *cls._FORMATTER.unpack(
-                data[: len(cls._FORMATTER.size)],
+                data[: cls._FORMATTER.size],
             )
         )
 

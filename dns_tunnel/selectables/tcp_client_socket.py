@@ -24,8 +24,5 @@ class TCPClientSocket(SelectableSocket):
     def session_id(self) -> int:
         return self._session_id
 
-    # def get_state(self) -> TCPClientSocketState:
-    #     return self._state
-
-    # def set_state(self, new_state: TCPClientSocketState):
-    #     self._state = new_state
+    def read(self) -> bytes:
+        return self._s.recv(4096)
