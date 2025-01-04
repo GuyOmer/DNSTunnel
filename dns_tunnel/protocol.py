@@ -63,7 +63,7 @@ class DNSPacketHeader:
         return cls(
             *cls._FORMATTER.unpack(
                 data[: cls._FORMATTER.size],
-            )
+            )[len(cls.MAGIC) :]
         )
 
     # TODO: Fix this annotation
