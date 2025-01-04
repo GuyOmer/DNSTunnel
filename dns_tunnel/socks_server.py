@@ -22,10 +22,10 @@ from dns_tunnel.socks5_protocol import (
     SOCKS5IPv4ConnectResponse,
 )
 
-PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "dns-server")
+PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")
 PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "53"))
-PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "dns-server")
-PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "53"))
+PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "0.0.0.0")
+PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "52"))
 
 
 # Initialize logger
@@ -104,15 +104,6 @@ class ProxyServerHandler:
             ingress.ack_message(msg.header.session_id, msg.header.sequence_number)
             logger.debug(f"ACK message for session {msg.header.session_id}, sequence {msg.header.sequence_number}")
             return
-
-        # Add ack to send queue
-        logger.info(f"Sending ACK for session {msg.header.session_id} and sequence {msg.header.sequence_number}")
-        ingress.add_to_write_queue(
-            create_ack_message(
-                msg.header.session_id,
-                msg.header.sequence_number,
-            ).to_bytes()
-        )
 
         # Handle the message
         if msg.header.session_id not in self._session_id_to_destination:

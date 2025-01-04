@@ -10,7 +10,7 @@ from dns_tunnel.protocol import (
     InvalidSocketBuffer,
     MessageType,
     NotEnoughDataError,
-    PartialHeaderError,
+    PartialHeaderError, create_ack_message,
 )
 from dns_tunnel.selectables.selectable_socket import SelectableSocket
 
@@ -119,12 +119,19 @@ class ProxySocket(SelectableSocket):
                 msg = DNSPacket.from_bytes(self._read_buf)
                 if msg.header.message_type == MessageType.ACK_MESSAGE.value:
                     msgs.append(msg)
-                elif self._sessions[msg.header.session_id].last_seq_got + 1 == msg.header.sequence_number:
-                    self._sessions[msg.header.session_id].last_seq_got += 1
-                    msgs.append(msg)
                 else:
-                    logger.debug(
-                        f"Read invalid sequence number for session {msg.header.session_id}, got sequence {msg.header.sequence_number} instead of {self._sessions[msg.header.session_id].last_seq_got + 1}"
+                    if self._sessions[msg.header.session_id].last_seq_got + 1 == msg.header.sequence_number:
+                        self._sessions[msg.header.session_id].last_seq_got += 1
+                        msgs.append(msg)
+                    else:
+                        logger.debug(
+                            f"Read invalid sequence number for session {msg.header.session_id}, got sequence {msg.header.sequence_number} instead of {self._sessions[msg.header.session_id].last_seq_got + 1}"
+                        )
+                    logger.info(
+                        f"Sending ACK for session {msg.header.session_id} and sequence {msg.header.sequence_number}"
+                    )
+                    self.add_to_write_queue(
+                        create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes()
                     )
 
                 # Consume read bytes from buffer

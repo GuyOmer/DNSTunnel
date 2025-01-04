@@ -15,10 +15,10 @@ logging.basicConfig(level=logging.DEBUG, format="Client %(module)s %(levelname)s
 logger = logging.getLogger(__name__)
 
 # TODO: CHange defaults
-PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "dns-server")
+PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")
 PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "53"))
-PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "dns-server")
-PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "53"))
+PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "0.0.0.0")
+PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "52"))
 
 
 class ClientHandler:
@@ -80,12 +80,6 @@ class ClientHandler:
                         ingress_socket.ack_message(msg.header.session_id, msg.header.sequence_number)
                         continue
 
-                    logger.info(
-                        f"Sending ACK for session {msg.header.session_id} and sequence {msg.header.sequence_number}"
-                    )
-                    ingress_socket.add_to_write_queue(
-                        create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes()
-                    )
                     client.add_to_write_queue(msg.payload)
                     logger.debug(f"Queued message for client {client.session_id}: {msg.payload}")
 
