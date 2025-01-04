@@ -23,6 +23,7 @@ class SessionInfo:
     last_acked_seq: int = -1
     last_sending_time: datetime = dataclasses.field(default_factory=datetime.datetime.now)
     retransmission_attempt_counter = 0
+    last_seq_got: int = -1
 
 
 RETRANSMISSION_TIME: Final = datetime.timedelta(seconds=10)
@@ -102,7 +103,11 @@ class ProxySocket(SelectableSocket):
         while self._read_buf:
             try:
                 msg = DNSPacket.from_bytes(self._read_buf)
-                msgs.append(msg)
+                if self._sessions[msg.header.session_id].last_seq_got + 1 != msg.header.sequence_number:
+                    logger.debug(f"Invalid sequence number for session {msg.header.session_id}, got sequence {msg.header.sequence_number} instead of {self._sessions[msg.header.session_id].last_seq_got + 1}")
+                else:
+                    self._sessions[msg.header.session_id].last_seq_got += 1
+                    msgs.append(msg)
 
                 # Consume read bytes from buffer
                 self._read_buf = self._read_buf[len(msg) :]
