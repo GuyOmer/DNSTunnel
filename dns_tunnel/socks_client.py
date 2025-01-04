@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import select
 import socket
 
@@ -10,7 +11,7 @@ from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 
 # Initialize logger
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, format="Client %(module)s %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # TODO: CHange defaults
@@ -25,7 +26,8 @@ class ClientHandler:
         self._rlist = []
         self._wlist = []
         self._clients: list[TCPClientSocket] = []
-        self._session_id_counter = 0
+
+        self._used_session_ids = set()
 
     def run(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -63,11 +65,9 @@ class ClientHandler:
                 self._clients.append(
                     TCPClientSocket(
                         tcp_client,
-                        self._session_id_counter,
-                        # _,
+                        self._get_session_id(),
                     )
                 )
-                self._session_id_counter += 1
 
             # Read from tcp clients, and queue messages for sending
             read_ready_clients = [ready for ready in r_ready if ready in self._clients]
@@ -76,16 +76,19 @@ class ClientHandler:
                 data = read_ready_client.read()
                 logger.debug(f"Read data from client {read_ready_client.session_id}: {data}")
                 for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
-                    chunk_bytes = bytes(chunk)
-                    ingress_socket.queue_to_session(chunk_bytes, read_ready_client.session_id)
+                    ingress_socket.add_dns_packet_to_write_queue(bytes(chunk), read_ready_client.session_id)
 
             if ingress_socket in r_ready:
                 msgs = ingress_socket.read()
                 for msg in msgs:
                     client = self._get_client_by_session_id(msg.header.session_id)
-                    if msg.header.message_type == MessageType.ACK_MESSAGE:
+                    if msg.header.message_type == MessageType.ACK_MESSAGE.value:
                         ingress_socket.ack_message(msg.header.session_id, msg.header.sequence_number)
                         continue
+
+                    logger.info(
+                        f"Sending ACK for session {msg.header.session_id} and sequence {msg.header.sequence_number}"
+                    )
                     ingress_socket.add_to_write_queue(
                         create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes()
                     )
@@ -98,12 +101,18 @@ class ClientHandler:
                 logger.debug(f"Sent data for client {write_ready_client.session_id}")
             if ingress_socket in w_ready:
                 ingress_socket.write()
-                logger.debug("Sent data to ingress socket")
 
     def _get_client_by_session_id(self, session_id):
         for client in self._clients:
             if client.session_id == session_id:
                 return client
+
+    def _get_session_id(self) -> int:
+        session_id = random.randint(0, 2**32)
+        while session_id in self._used_session_ids:
+            session_id = random.randint(0, 2**32)
+        self._used_session_ids.add(session_id)
+        return session_id
 
 
 if __name__ == "__main__":

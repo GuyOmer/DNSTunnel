@@ -39,7 +39,7 @@ class DNSPacketHeader:
     sequence_number: int
 
     MAGIC: Final = b"deadbeaf"  # TODO: Make sure this makes sense
-    _HEADER_FMT = f"!{len(MAGIC)}bIBBI"  # TODO: make sure this is correct
+    _HEADER_FMT = f"!{len(MAGIC)}bIBII"  # TODO: make sure this is correct
     _FORMATTER = struct.Struct(_HEADER_FMT)
 
     def to_bytes(self) -> bytes:
@@ -66,9 +66,8 @@ class DNSPacketHeader:
             )[len(cls.MAGIC) :]
         )
 
-    # TODO: Fix this annotation
     def __len__(self) -> int:
-        return type(self)._FORMATTER.size
+        return max(0, type(self)._FORMATTER.size)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -100,11 +99,23 @@ class DNSPacket:
 
         return cls(header, payload)
 
+    @classmethod
+    def from_payload(cls, payload: bytes, message_type: MessageType, session_id: int, sequence_number: int) -> Self:
+        return cls(
+            DNSPacketHeader(
+                len(payload),
+                message_type,
+                session_id,
+                sequence_number,
+            ),
+            payload,
+        )
+
     def __len__(self) -> int:
         return len(self.header) + self.header.payload_length
 
 
-def create_custom_dns_query(domain_name: str, payload: bytes) -> dns.message.Message:
+def create_custom_dns_query(domain_name: str, payload: bytes) -> bytes:
     """
     Creates a DNS query with a custom payload embedded in a TXT record.
 
@@ -133,36 +144,27 @@ def create_custom_dns_query(domain_name: str, payload: bytes) -> dns.message.Mes
 
     # Convert the DNS message to wire format
     query_wire = query.to_wire()
-    return
+    return query_wire
 
 
-def send_custom_dns_query(server_ip: str, domain_name: str, payload: bytes) -> None:
-    """
-    Sends a DNS query with a custom payload to the specified server.
+# def send_custom_dns_query(server_ip: str, domain_name: str, payload: bytes) -> None:
+#     """
+#     Sends a DNS query with a custom payload to the specified server.
 
-    :param server_ip: The IP address of the DNS server (e.g., '8.8.8.8').
-    :param domain_name: The domain name to query.
-    :param payload: The custom payload to send.
-    """
-    # Create the DNS query message with the custom payload
-    dns_query = create_custom_dns_query(domain_name, payload)
+#     :param server_ip: The IP address of the DNS server (e.g., '8.8.8.8').
+#     :param domain_name: The domain name to query.
+#     :param payload: The custom payload to send.
+#     """
+#     # Create the DNS query message with the custom payload
+#     dns_query = create_custom_dns_query(domain_name, payload)
 
-    print(f"Sending custom DNS query with payload to {server_ip}")
+#     print(f"Sending custom DNS query with payload to {server_ip}")
 
-    # Send the query and receive the response
-    response = dns.query.udp(dns_query, server_ip)
+#     # Send the query and receive the response
+#     response = dns.query.udp(dns_query, server_ip)
 
-    print(f"Received response:")
-    print(response)
-
-
-def get_socks_greeting_message(): ...
-
-
-def convert_data_to_tunnel_messages(data: bytes, session_id: int) -> list[DNSPacket]:
-    chunks = []
-
-    return chunks
+#     print(f"Received response:")
+#     print(response)
 
 
 def create_ack_message(session_id: int, sequence_number: int) -> DNSPacket:
@@ -171,7 +173,7 @@ def create_ack_message(session_id: int, sequence_number: int) -> DNSPacket:
             0,
             MessageType.ACK_MESSAGE,
             session_id,
-            sequence_number,  # When acking, use the sequnce number we are acking
+            sequence_number,  # When ACK-ing, use the sequence number we are ACK-ing
         ),
-        f"Ack-ing {sequence_number} for session ID: {session_id}".encode("utf-8"),
+        b"",
     )

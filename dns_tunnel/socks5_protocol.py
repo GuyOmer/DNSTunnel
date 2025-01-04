@@ -63,6 +63,8 @@ class SOCKS5MessagePartFormat(enum.StrEnum):
     IPV4_HOST = "4B"
     PORT = "H"
     STATUS = "B"
+    ADDRESS_LENGTH = "B"
+    DNS_ADDRESS_CHAR = "c"
 
 
 @dataclasses.dataclass
@@ -167,6 +169,160 @@ class SOCKS5IPv4ConnectRequest(SOCKS5Message):
         return cls(
             SOCKS5CommandCode(raw_command),
             host,
+            port,
+        )
+
+
+@dataclasses.dataclass
+class SOCKS5DNSConnectRequest(SOCKS5Message):
+    command: SOCKS5CommandCode
+    address: str
+    port: bytes
+
+    address_type: Final = SOCKS5AddressType.DOMAIN_NAME
+
+    _CONNECT_REQUEST_FORMAT: Final = "!" + "".join(
+        [
+            SOCKS5MessagePartFormat.VERSION,
+            SOCKS5MessagePartFormat.COMMAND_CODE,
+            SOCKS5MessagePartFormat.RESERVED,
+            SOCKS5MessagePartFormat.ADDRESS_TYPE,
+            SOCKS5MessagePartFormat.ADDRESS_LENGTH,
+        ]
+    )
+
+    _DNS_CONNECT_REQUEST_FORMAT: Final = "!" + "".join(
+        [
+            SOCKS5MessagePartFormat.DNS_ADDRESS_CHAR,
+            SOCKS5MessagePartFormat.PORT,
+        ]
+    )
+
+    @classmethod
+    def _get_dns_connect_request_format(cls, address_len: int) -> str:
+        return "!" + "".join(
+            [
+                str(address_len),
+                SOCKS5MessagePartFormat.DNS_ADDRESS_CHAR,
+                SOCKS5MessagePartFormat.PORT,
+            ]
+        )
+
+    def to_bytes(self) -> bytes:
+        connect = struct.pack(
+            type(self)._CONNECT_REQUEST_FORMAT,
+            SOCKS5_VERSION,
+            self.command.value,
+            0,  # Reserved
+            self.address_type,
+            len(self.address),
+        )
+
+        dns = struct.pack(
+            type(self)._get_dns_connect_request_format(len(self.address)),
+            *map(int, self.address),
+            self.port,
+        )
+
+        return connect + dns
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        super().from_bytes(data)
+
+        _, raw_command, __, raw_address_type, length = struct.unpack(
+            cls._CONNECT_REQUEST_FORMAT, data[: struct.calcsize(cls._CONNECT_REQUEST_FORMAT)]
+        )
+
+        unpacked = struct.unpack(
+            cls._get_dns_connect_request_format(length), data[struct.calcsize(cls._CONNECT_REQUEST_FORMAT) :]
+        )
+        address = b"".join(unpacked[:-1]).decode("utf-8")
+        port = int(unpacked[-1])
+
+        if raw_address_type != SOCKS5AddressType.DOMAIN_NAME:
+            raise ValueError(f"Unsupported address type in SOCKS5 request: {raw_address_type}")
+
+        return cls(
+            SOCKS5CommandCode(raw_command),
+            address,
+            port,
+        )
+
+
+@dataclasses.dataclass
+class SOCKS5DNSConnectResponse(SOCKS5Message):
+    status: SOCKS5ConnectRequestStatus
+    address: str
+    port: bytes
+
+    address_type: Final = SOCKS5AddressType.DOMAIN_NAME
+
+    _CONNECT_REQUEST_FORMAT: Final = "!" + "".join(
+        [
+            SOCKS5MessagePartFormat.VERSION,
+            SOCKS5MessagePartFormat.STATUS,
+            SOCKS5MessagePartFormat.RESERVED,
+            SOCKS5MessagePartFormat.ADDRESS_TYPE,
+            SOCKS5MessagePartFormat.ADDRESS_LENGTH,
+        ]
+    )
+
+    _DNS_CONNECT_REQUEST_FORMAT: Final = "!" + "".join(
+        [
+            SOCKS5MessagePartFormat.DNS_ADDRESS_CHAR,
+            SOCKS5MessagePartFormat.PORT,
+        ]
+    )
+
+    @classmethod
+    def _get_dns_connect_request_format(cls, address_len: int) -> str:
+        return "!" + "".join(
+            [
+                str(address_len),
+                SOCKS5MessagePartFormat.DNS_ADDRESS_CHAR,
+                SOCKS5MessagePartFormat.PORT,
+            ]
+        )
+
+    def to_bytes(self) -> bytes:
+        connect = struct.pack(
+            type(self)._CONNECT_REQUEST_FORMAT,
+            SOCKS5_VERSION,
+            self.status.value,
+            0,  # Reserved
+            self.address_type,
+            len(self.address),
+        )
+
+        dns = struct.pack(
+            type(self)._get_dns_connect_request_format(len(self.address)),
+            *[c.encode() for c in self.address],
+            self.port,
+        )
+
+        return connect + dns
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        super().from_bytes(data)
+
+        _, status, __, raw_address_type, length = struct.unpack(
+            cls._CONNECT_REQUEST_FORMAT, data[: struct.calcsize(cls._CONNECT_REQUEST_FORMAT)]
+        )
+
+        unpacked = struct.unpack(
+            cls._get_dns_connect_request_format(length), data[struct.calcsize(cls._CONNECT_REQUEST_FORMAT) :]
+        )
+        address = "".join(unpacked[:-1])
+        port = int(unpacked[-1])
+
+        if raw_address_type != SOCKS5AddressType.DOMAIN_NAME:
+            raise ValueError(f"Unsupported address type in SOCKS5 request: {raw_address_type}")
+
+        return cls(
+            SOCKS5ConnectRequestStatus(status),
+            address,
             port,
         )
 

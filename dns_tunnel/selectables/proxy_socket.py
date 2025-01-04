@@ -49,7 +49,11 @@ class ProxySocket(SelectableSocket):
                 return True
         return False
 
-    def queue_to_session(self, payload: bytes, session_id: int):
+    def add_dns_packet_to_write_queue(self, payload: bytes, session_id: int):
+        # TODO: REMOVE
+        if not isinstance(payload, bytes):
+            raise TypeError(f"Payload must be bytes, got {type(payload)}")
+
         session = self._sessions[session_id]
         session.sending_queue.append(
             DNSPacket(
@@ -81,12 +85,19 @@ class ProxySocket(SelectableSocket):
             session.last_sent_seq = msg_to_send.header.sequence_number
             session.last_sending_time = datetime.datetime.now()
 
+        if self._write_buffer:
+            logger.debug(f"Sent data to {type(self).__name__}")
             bytes_sent = self._s.sendto(self._write_buffer, self._proxy_address)
             if bytes_sent != len(self._write_buffer):
                 raise RuntimeError("Sending was fragmented, this is not supported")
 
+            # Reset write buffer
+            self._write_buffer = self._write_buffer[bytes_sent:]  # will be empty
+
     def ack_message(self, session_id: int, sequence_number: int):
+        logger.info(f"Got ACK for session {session_id} and sequence {sequence_number}")
         if sequence_number > self._sessions[session_id].last_acked_seq:
+            logger.info(f"ACK-ed: session {session_id} and sequence {sequence_number}")
             self._sessions[session_id].last_acked_seq = sequence_number
             self._sessions[session_id].sending_queue.pop(0)
 
@@ -103,11 +114,15 @@ class ProxySocket(SelectableSocket):
         while self._read_buf:
             try:
                 msg = DNSPacket.from_bytes(self._read_buf)
-                if self._sessions[msg.header.session_id].last_seq_got + 1 != msg.header.sequence_number:
-                    logger.debug(f"Invalid sequence number for session {msg.header.session_id}, got sequence {msg.header.sequence_number} instead of {self._sessions[msg.header.session_id].last_seq_got + 1}")
-                else:
+                if msg.header.message_type == MessageType.ACK_MESSAGE.value:
+                    msgs.append(msg)
+                elif self._sessions[msg.header.session_id].last_seq_got + 1 == msg.header.sequence_number:
                     self._sessions[msg.header.session_id].last_seq_got += 1
                     msgs.append(msg)
+                else:
+                    logger.debug(
+                        f"Read invalid sequence number for session {msg.header.session_id}, got sequence {msg.header.sequence_number} instead of {self._sessions[msg.header.session_id].last_seq_got + 1}"
+                    )
 
                 # Consume read bytes from buffer
                 self._read_buf = self._read_buf[len(msg) :]
