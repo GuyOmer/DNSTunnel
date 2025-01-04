@@ -27,7 +27,7 @@ class SessionInfo:
 
 
 RETRANSMISSION_TIME: Final = datetime.timedelta(seconds=10)
-MAX_RETRANSMISSION_ATTEMPTS: Final = 3
+MAX_RETRANSMISSION_ATTEMPTS: Final = 5
 
 
 class ProxySocket(SelectableSocket):
@@ -73,7 +73,10 @@ class ProxySocket(SelectableSocket):
             elif session.last_sending_time + RETRANSMISSION_TIME < datetime.datetime.now():
                 # If too many retransmission attempts, quit
                 if session.retransmission_attempt_counter > MAX_RETRANSMISSION_ATTEMPTS:
-                    raise RuntimeError()
+                    logger.error(
+                        f"Too many retransmission attempts for session {session.sending_queue[0].header.session_id}"
+                    )
+                    continue
                 else:
                     msg_to_send = session.sending_queue[0]
                     session.retransmission_attempt_counter += 1

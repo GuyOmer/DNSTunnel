@@ -69,19 +69,13 @@ class ClientHandler:
                     )
                 )
 
-            # Read from tcp clients, and queue messages for sending
-            read_ready_clients = [ready for ready in r_ready if ready in self._clients]
-            for read_ready_client in read_ready_clients:
-                # read as much as possible, non blocking
-                data = read_ready_client.read()
-                logger.debug(f"Read data from client {read_ready_client.session_id}: {data}")
-                for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
-                    ingress_socket.add_dns_packet_to_write_queue(bytes(chunk), read_ready_client.session_id)
-
             if ingress_socket in r_ready:
                 msgs = ingress_socket.read()
                 for msg in msgs:
                     client = self._get_client_by_session_id(msg.header.session_id)
+                    if not client:
+                        continue
+
                     if msg.header.message_type == MessageType.ACK_MESSAGE.value:
                         ingress_socket.ack_message(msg.header.session_id, msg.header.sequence_number)
                         continue
@@ -95,6 +89,21 @@ class ClientHandler:
                     client.add_to_write_queue(msg.payload)
                     logger.debug(f"Queued message for client {client.session_id}: {msg.payload}")
 
+            # Read from tcp clients, and queue messages for sending
+            read_ready_clients = [ready for ready in r_ready if ready in self._clients]
+            for read_ready_client in read_ready_clients:
+                # read as much as possible, non blocking
+                data = read_ready_client.read()
+
+                if not data:
+                    logger.info(f"Client {read_ready_client.session_id} closed")
+                    self._clients.remove(read_ready_client)
+                    continue
+
+                logger.debug(f"Read data from client {read_ready_client.session_id}: {data}")
+                for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
+                    ingress_socket.add_dns_packet_to_write_queue(bytes(chunk), read_ready_client.session_id)
+
             write_ready_clients = [ready for ready in w_ready if ready in self._clients]
             for write_ready_client in write_ready_clients:
                 write_ready_client.write()
@@ -106,6 +115,8 @@ class ClientHandler:
         for client in self._clients:
             if client.session_id == session_id:
                 return client
+
+        # raise ValueError(f"Client with session id {session_id} not found")
 
     def _get_session_id(self) -> int:
         session_id = random.randint(0, 2**32)

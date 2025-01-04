@@ -3,6 +3,7 @@ import logging
 import os
 import select
 import socket
+from typing import Iterable, cast
 
 import more_itertools
 
@@ -57,14 +58,14 @@ class ProxyServerHandler:
         logger.info("Proxy server started and listening for connections")
 
         while True:
-            self._rlist = [ingress_socket] + list(self._session_id_to_destination.values())
+            self._rlist = [ingress_socket] + [d for d in self._session_id_to_destination.values() if d]
 
             self._wlist = []
             if ingress_socket.needs_to_write():
                 self._wlist.append(ingress_socket)
 
             for dest in self._session_id_to_destination.values():
-                if dest.needs_to_write():
+                if dest and dest.needs_to_write():
                     self._wlist.append(dest)
 
             r_ready, w_ready, _ = select.select(self._rlist, self._wlist, [])
@@ -76,8 +77,18 @@ class ProxyServerHandler:
                 for msg in msgs:
                     self._handle_incoming_ingress_message(ingress_socket, msg)
 
-            for dest in [r for r in r_ready if r in self._session_id_to_destination.values()]:
+            for dest in cast(
+                Iterable[TCPClientSocket],
+                [r for r in r_ready if r in self._session_id_to_destination.values()],
+            ):
                 data = dest.read()  # TODO: Need to be real TCP read
+
+                if not data:
+                    logger.info(f"Destination socket {dest.session_id} closed")
+                    # del self._session_id_to_destination[dest.session_id]
+                    self._session_id_to_destination[dest.session_id] = None
+                    continue
+
                 logger.debug(f"Read {len(data)} bytes from destination socket {dest.session_id}")
                 for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
                     ingress_socket.add_dns_packet_to_write_queue(bytes(chunk), dest.session_id)
@@ -135,7 +146,23 @@ class ProxyServerHandler:
                             )
 
                         dest_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        dest_sock.connect((command_msg.address, command_msg.port))  # TODO: might this block?
+
+                        try:
+                            dest_sock.connect((command_msg.address, command_msg.port))  # TODO: might this block?
+                        except (socket.gaierror, ConnectionRefusedError):
+                            ingress.add_dns_packet_to_write_queue(
+                                SOCKS5DNSConnectResponse(
+                                    SOCKS5ConnectRequestStatus.HOST_UNREACHABLE,
+                                    command_msg.address,
+                                    command_msg.port,
+                                ).to_bytes(),
+                                msg.header.session_id,
+                            )
+                            logger.error(
+                                f"Host {command_msg.address}:{command_msg.port} not found for session {msg.header.session_id}"
+                            )
+                            return
+
                         self._session_id_to_destination[msg.header.session_id] = TCPClientSocket(
                             dest_sock, msg.header.session_id
                         )
@@ -155,6 +182,10 @@ class ProxyServerHandler:
         else:
             # proxy tunnel already setup, just forward messages
             destination = self._session_id_to_destination[msg.header.session_id]
+            if not destination:
+                logger.debug("Message for a deleted destination")
+                return
+
             destination.add_to_write_queue(msg.payload)
             logger.debug(f"Forwarded message to destination for session {msg.header.session_id}")
 
