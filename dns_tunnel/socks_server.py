@@ -137,10 +137,17 @@ class ProxyServerHandler:
                             )
 
                         dest_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        dest_sock.setblocking(False)
 
                         try:
-                            dest_sock.connect((command_msg.address, command_msg.port))  # TODO: might this block?
-                        except (socket.gaierror, ConnectionRefusedError):
+                            try:
+                                dest_sock.connect((command_msg.address, command_msg.port))
+                            except BlockingIOError:
+                                _, connected, __ = select.select([], [dest_sock], [], 0.4)
+                                if not connected:
+                                    raise ConnectionRefusedError("Connection refused")
+                        except (socket.gaierror, ConnectionRefusedError, BlockingIOError) as e:
+                            logger.error(f"Failed to connect to {command_msg.address}:{command_msg.port} with {e}")
                             ingress.add_dns_packet_to_write_queue(
                                 SOCKS5DNSConnectResponse(
                                     SOCKS5ConnectRequestStatus.HOST_UNREACHABLE,

@@ -10,7 +10,8 @@ from dns_tunnel.protocol import (
     InvalidSocketBuffer,
     MessageType,
     NotEnoughDataError,
-    PartialHeaderError, create_ack_message,
+    PartialHeaderError,
+    create_ack_message,
 )
 from dns_tunnel.selectables.selectable_socket import SelectableSocket
 
@@ -37,7 +38,6 @@ class ProxySocket(SelectableSocket):
         self._proxy_address = proxy_address
 
         self._read_buf = b""
-        # self._state = initial_state
         self._sessions: dict[int, SessionInfo] = collections.defaultdict(SessionInfo)
 
     def needs_to_write(self):
@@ -99,10 +99,15 @@ class ProxySocket(SelectableSocket):
 
     def ack_message(self, session_id: int, sequence_number: int):
         logger.info(f"Got ACK for session {session_id} and sequence {sequence_number}")
-        if sequence_number > self._sessions[session_id].last_acked_seq:
+        if sequence_number == self._sessions[session_id].last_acked_seq + 1:
             logger.info(f"ACK-ed: session {session_id} and sequence {sequence_number}")
             self._sessions[session_id].last_acked_seq = sequence_number
             self._sessions[session_id].sending_queue.pop(0)
+        else:
+            logger.debug(
+                f"Got invalid sequence number for session {session_id}, got sequence {sequence_number} instead of {self._sessions[session_id].last_acked_seq + 1}"
+            )
+            raise ValueError()
 
     def read(self) -> list[DNSPacket]:
         # TODO: Needs to be non blocking

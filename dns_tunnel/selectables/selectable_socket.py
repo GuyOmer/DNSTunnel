@@ -2,14 +2,6 @@ import abc
 import logging
 import socket
 
-from dns_tunnel.protocol import (
-    DNSPacket,
-    DNSPacketHeader,
-    InvalidSocketBuffer,
-    NotEnoughDataError,
-    PartialHeaderError,
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -32,10 +24,6 @@ class SelectableSocket:
     def write(self) -> int:
         bytes_sent = self._s.send(self._write_buffer)
         self._write_buffer = self._write_buffer[bytes_sent:]
-
-        if self._write_buffer:
-            raise RuntimeError("Sending was fragmented, this is not supported")
-
         return bytes_sent
 
     def read(self):

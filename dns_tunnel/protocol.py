@@ -60,11 +60,14 @@ class DNSPacketHeader:
             # data is long enough to contain the magic, but doesn't contain it
             raise InvalidSocketBuffer(f"Buffer starts with '{data[:len(cls.MAGIC)]}', are expected '{cls.MAGIC}'")
 
-        return cls(
+        res = cls(
             *cls._FORMATTER.unpack(
                 data[: cls._FORMATTER.size],
             )[len(cls.MAGIC) :]
         )
+        if res.message_type != 1 and res.message_type != 10:
+            pass
+        return res
 
     def __len__(self) -> int:
         return max(0, type(self)._FORMATTER.size)
@@ -98,18 +101,6 @@ class DNSPacket:
             ) from e
 
         return cls(header, payload)
-
-    @classmethod
-    def from_payload(cls, payload: bytes, message_type: MessageType, session_id: int, sequence_number: int) -> Self:
-        return cls(
-            DNSPacketHeader(
-                len(payload),
-                message_type,
-                session_id,
-                sequence_number,
-            ),
-            payload,
-        )
 
     def __len__(self) -> int:
         return len(self.header) + self.header.payload_length
