@@ -38,7 +38,7 @@ class DNSPacketHeader:
     session_id: int
     sequence_number: int
 
-    MAGIC: Final = b"deadbeaf"  # TODO: Make sure this makes sense
+    MAGIC: Final = b"deadbeef"  # TODO: Make sure this makes sense
     _HEADER_FMT = f"!{len(MAGIC)}bIBII"  # TODO: make sure this is correct
     _FORMATTER = struct.Struct(_HEADER_FMT)
 
@@ -100,7 +100,8 @@ class DNSPacket:
                 f"Message size is  {header_length + header.payload_length} bytes, but only {len(data)} bytes are aviliable"
             ) from e
 
-        return cls(header, payload)
+        res = cls(header, payload)
+        return res
 
     def __len__(self) -> int:
         return len(self.header) + self.header.payload_length

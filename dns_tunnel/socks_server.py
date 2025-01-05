@@ -7,7 +7,7 @@ from typing import Iterable, cast
 
 import more_itertools
 
-from dns_tunnel.protocol import DNSPacket, MessageType, create_ack_message
+from dns_tunnel.protocol import DNSPacket, MessageType
 from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks5_protocol import (
@@ -18,8 +18,6 @@ from dns_tunnel.socks5_protocol import (
     SOCKS5DNSConnectResponse,
     SOCKS5Greeting,
     SOCKS5GreetingResponse,
-    SOCKS5IPv4ConnectRequest,
-    SOCKS5IPv4ConnectResponse,
 )
 
 PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")

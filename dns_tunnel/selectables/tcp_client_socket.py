@@ -27,5 +27,5 @@ class TCPClientSocket(SelectableSocket):
     def read(self) -> bytes:
         try:
             return self._s.recv(4096)
-        except ConnectionResetError:
+        except (ConnectionResetError, ConnectionRefusedError):
             return b""

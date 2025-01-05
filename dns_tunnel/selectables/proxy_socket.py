@@ -25,6 +25,7 @@ class SessionInfo:
     last_sending_time: datetime = dataclasses.field(default_factory=datetime.datetime.now)
     retransmission_attempt_counter = 0
     last_seq_got: int = -1
+    is_active: bool = True
 
 
 RETRANSMISSION_TIME: Final = datetime.timedelta(seconds=10)
@@ -50,10 +51,6 @@ class ProxySocket(SelectableSocket):
         return False
 
     def add_dns_packet_to_write_queue(self, payload: bytes, session_id: int):
-        # TODO: REMOVE
-        if not isinstance(payload, bytes):
-            raise TypeError(f"Payload must be bytes, got {type(payload)}")
-
         session = self._sessions[session_id]
         session.sending_queue.append(
             DNSPacket(
@@ -63,7 +60,7 @@ class ProxySocket(SelectableSocket):
         session.seq_counter += 1
 
     def write(self):
-        pending_send = [session for session in self._sessions.values() if session.sending_queue]
+        pending_send = [session for session in self._sessions.values() if session.sending_queue and session.is_active]
         for session in pending_send:
             # Last message was acked, can send the next one
             if session.last_sent_seq == session.last_acked_seq:
@@ -76,6 +73,7 @@ class ProxySocket(SelectableSocket):
                     logger.error(
                         f"Too many retransmission attempts for session {session.sending_queue[0].header.session_id}"
                     )
+                    session.is_active = False
                     continue
                 else:
                     msg_to_send = session.sending_queue[0]
@@ -88,14 +86,23 @@ class ProxySocket(SelectableSocket):
             session.last_sent_seq = msg_to_send.header.sequence_number
             session.last_sending_time = datetime.datetime.now()
 
-        if self._write_buffer:
-            logger.debug(f"Sent data to {type(self).__name__}")
-            bytes_sent = self._s.sendto(self._write_buffer, self._proxy_address)
-            if bytes_sent != len(self._write_buffer):
-                raise RuntimeError("Sending was fragmented, this is not supported")
+        total_sent = 0
+        for m in [b"deadbeef" + c for c in self._write_buffer.split(b"deadbeef")[1:]]:
+            bytes_sent = self._s.sendto(m, self._proxy_address)
+            total_sent += bytes_sent
 
-            # Reset write buffer
-            self._write_buffer = self._write_buffer[bytes_sent:]  # will be empty
+        if total_sent != len(self._write_buffer):
+            raise RuntimeError("Sending was fragmented, this is not supported")
+        self._write_buffer = self._write_buffer[total_sent:]
+
+        # while self._write_buffer:
+        #     logger.debug(f"Sent data to {type(self).__name__}")
+        #     bytes_sent = self._s.sendto(b"deadbeef" + self._write_buffer.partition(b"deadbeef")[2], self._proxy_address)
+        #     # if bytes_sent != len(self._write_buffer):
+        #     #     raise RuntimeError("Sending was fragmented, this is not supported")
+
+        #     # Reset write buffer
+        #     self._write_buffer = self._write_buffer[bytes_sent:]  # will be empty
 
     def ack_message(self, session_id: int, sequence_number: int):
         logger.info(f"Got ACK for session {session_id} and sequence {sequence_number}")
@@ -103,6 +110,8 @@ class ProxySocket(SelectableSocket):
             logger.info(f"ACK-ed: session {session_id} and sequence {sequence_number}")
             self._sessions[session_id].last_acked_seq = sequence_number
             self._sessions[session_id].sending_queue.pop(0)
+
+            self._sessions[session_id].retransmission_attempt_counter = 0
         else:
             logger.debug(
                 f"Got invalid sequence number for session {session_id}, got sequence {sequence_number} instead of {self._sessions[session_id].last_acked_seq + 1}"
@@ -129,9 +138,10 @@ class ProxySocket(SelectableSocket):
                         self._sessions[msg.header.session_id].last_seq_got += 1
                         msgs.append(msg)
                     else:
-                        logger.debug(
+                        logger.warning(
                             f"Read invalid sequence number for session {msg.header.session_id}, got sequence {msg.header.sequence_number} instead of {self._sessions[msg.header.session_id].last_seq_got + 1}"
                         )
+
                     logger.info(
                         f"Sending ACK for session {msg.header.session_id} and sequence {msg.header.sequence_number}"
                     )
