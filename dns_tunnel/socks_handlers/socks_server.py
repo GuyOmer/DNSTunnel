@@ -102,7 +102,6 @@ class ProxyServerHandler(BaseHandler):
     def remove_edge_by_session_id(self, session_id: int) -> None:
         logger.info(f"Closing session {session_id}")
         del self._session_id_to_destination[session_id]
-        del self._session_id_to_socks5_handshake_state[session_id]
 
     def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
         logger.debug(f"Handling incoming message for session {msg.header.session_id}")
