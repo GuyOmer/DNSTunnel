@@ -19,7 +19,8 @@ class MessageType(enum.Enum):
     CLOSE_SESSION = 3
 
 
-class DNSPacketError(Exception): ...
+class DNSPacketError(Exception):
+    ...
 
 
 class InvalidSocketBuffer(DNSPacketError):
@@ -30,7 +31,8 @@ class PartialHeaderError(DNSPacketError):
     """Raised when not enough data was read to construct an header"""
 
 
-class NotEnoughDataError(DNSPacketError): ...
+class NotEnoughDataError(DNSPacketError):
+    ...
 
 
 @dataclasses.dataclass
@@ -62,9 +64,8 @@ class DNSPacketHeader:
             # data is long enough to contain the magic, but doesn't contain it
             raise InvalidSocketBuffer(f"Buffer starts with '{data[:len(cls.MAGIC)]}', are expected '{cls.MAGIC}'")
 
-        length, raw_message_type, session_id, sequence_number = cls._FORMATTER.unpack(data[: cls._FORMATTER.size])[
-            len(cls.MAGIC):
-        ]
+        length, raw_message_type, session_id, sequence_number = cls._FORMATTER.unpack(
+            data[: cls._FORMATTER.size])[len(cls.MAGIC):]
         res = cls(length, MessageType(raw_message_type), session_id, sequence_number)
         return res
 
@@ -98,7 +99,8 @@ class DNSPacket:
             payload = dns_packet_bytes[header_length: header_length + header.payload_length]
         except IndexError as e:
             raise NotEnoughDataError(
-                f"Message size is  {header_length + header.payload_length} bytes, but only {len(dns_packet_bytes)} bytes are available"
+                f"Message size is  {header_length + header.payload_length} bytes, "
+                f"but only {len(dns_packet_bytes)} bytes are available"
             ) from e
 
         res = cls(header, payload)
@@ -112,7 +114,7 @@ def create_custom_dns_query(payload: bytes) -> bytes:
     """
     Creates a DNS query with a custom payload embedded in a TXT record.
 
-    :param payload: The custom payload to send (e.g., an 8x8 image encoded in base64).
+    :param payload: The custom payload to send (e.g., a 8x8 image encoded in base64).
     :return: The DNS query message.
     """
     # NOTE: max size per record is 189 bytes?

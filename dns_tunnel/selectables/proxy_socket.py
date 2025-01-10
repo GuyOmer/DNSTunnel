@@ -70,7 +70,7 @@ class ProxySocket(SelectableSocket):
             if session.last_sent_seq == session.last_acked_seq:
                 msg_to_send = session.sending_queue[0]
 
-            # Last message wasnt acked, check if we need to retransmit it)
+            # Last message wasn't acked, check if we need to retransmit it)
             elif session.last_sending_time + RETRANSMISSION_TIME < datetime.datetime.now():
                 # If too many retransmission attempts, quit
                 if session.retransmission_attempt_counter > MAX_RETRANSMISSION_ATTEMPTS:
@@ -107,7 +107,8 @@ class ProxySocket(SelectableSocket):
             self._sessions[session_id].retransmission_attempt_counter = 0
         else:
             logger.debug(
-                f"Got invalid sequence number for session {session_id}, got sequence {sequence_number} instead of {self._sessions[session_id].last_acked_seq + 1}"
+                f"Got invalid sequence number for session {session_id}, "
+                f"got sequence {sequence_number} instead of {self._sessions[session_id].last_acked_seq + 1}"
             )
 
     def remove_session(self, session_id: int):
@@ -134,7 +135,9 @@ class ProxySocket(SelectableSocket):
                         msgs.append(msg)
                     else:
                         logger.warning(
-                            f"Read invalid sequence number for session {msg.header.session_id}, got sequence {msg.header.sequence_number} instead of {self._sessions[msg.header.session_id].last_seq_got + 1}"
+                            f"Read invalid sequence number for session {msg.header.session_id}, "
+                            f"got sequence {msg.header.sequence_number} instead of "
+                            f"{self._sessions[msg.header.session_id].last_seq_got + 1}"
                         )
 
                     logger.info(

@@ -101,7 +101,8 @@ class ProxyServerHandler(BaseHandler):
         self._session_id_to_destination[session_id] = None
 
     def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
-        if msg.header.message_type == MessageType.NORMAL_MESSAGE and msg.header.session_id not in self._session_id_to_destination:
+        if (msg.header.message_type == MessageType.NORMAL_MESSAGE and
+                msg.header.session_id not in self._session_id_to_destination):
             logger.debug(f"Handling incoming message for session {msg.header.session_id}")
             self._handle_socks5_handshake(ingress, msg)
             return
@@ -159,7 +160,8 @@ class ProxyServerHandler(BaseHandler):
                             msg.header.session_id,
                         )
                         logger.error(
-                            f"Host {command_msg.address}:{command_msg.port} not found for session {msg.header.session_id}"
+                            f"Host {command_msg.address}:{command_msg.port} not found for session "
+                            f"{msg.header.session_id}"
                         )
                         return
 
@@ -173,7 +175,8 @@ class ProxyServerHandler(BaseHandler):
                         msg.header.session_id,
                     )
                     logger.info(
-                        f"Established TCP connection to {command_msg.address}:{command_msg.port} for session {msg.header.session_id}"
+                        f"Established TCP connection to {command_msg.address}:{command_msg.port} for session "
+                        f"{msg.header.session_id}"
                     )
                 case _:
                     logger.error("Invalid state")

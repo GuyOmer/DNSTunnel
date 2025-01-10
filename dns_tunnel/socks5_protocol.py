@@ -97,7 +97,8 @@ class SOCKS5Greeting(SOCKS5Message):
 
         if amount_of_methods != len(methods):
             raise ValueError(
-                f"Expected {amount_of_methods} auth methods, but only {len(methods)} ({', '.join([m.name for m in methods])}) are available"
+                f"Expected {amount_of_methods} auth methods, "
+                f"but only {len(methods)} ({', '.join([m.name for m in methods])}) are available"
             )
 
         return cls(methods)
@@ -233,7 +234,7 @@ class SOCKS5DNSConnectRequest(SOCKS5Message):
         )
 
         unpacked = struct.unpack(
-            cls._get_dns_connect_request_format(length), data[struct.calcsize(cls._CONNECT_REQUEST_FORMAT) :]
+            cls._get_dns_connect_request_format(length), data[struct.calcsize(cls._CONNECT_REQUEST_FORMAT):]
         )
         address = b"".join(unpacked[:-1]).decode("utf-8")
         port = int(unpacked[-1])
@@ -310,7 +311,7 @@ class SOCKS5DNSConnectResponse(SOCKS5Message):
         )
 
         unpacked = struct.unpack(
-            cls._get_dns_connect_request_format(length), data[struct.calcsize(cls._CONNECT_REQUEST_FORMAT) :]
+            cls._get_dns_connect_request_format(length), data[struct.calcsize(cls._CONNECT_REQUEST_FORMAT):]
         )
         address = "".join(unpacked[:-1])
         port = int(unpacked[-1])
