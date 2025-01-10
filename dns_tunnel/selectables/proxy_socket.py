@@ -40,9 +40,10 @@ class ProxySocket(SelectableSocket):
 
         self._read_buf = b""
         self._sessions: dict[int, SessionInfo] = collections.defaultdict(SessionInfo)
+        self._write_messages: list[bytes] = []
 
     def needs_to_write(self):
-        if super().needs_to_write():
+        if self._write_messages:
             return True
 
         for session in self._sessions.values():
@@ -82,27 +83,15 @@ class ProxySocket(SelectableSocket):
             else:
                 continue
 
-            self._write_buffer += msg_to_send.to_bytes()
+            self._write_messages.append(msg_to_send.to_bytes())
             session.last_sent_seq = msg_to_send.header.sequence_number
             session.last_sending_time = datetime.datetime.now()
 
-        total_sent = 0
-        for m in [b"deadbeef" + c for c in self._write_buffer.split(b"deadbeef")[1:]]:
-            bytes_sent = self._s.sendto(m, self._proxy_address)
-            total_sent += bytes_sent
-
-        if total_sent != len(self._write_buffer):
-            raise RuntimeError("Sending was fragmented, this is not supported")
-        self._write_buffer = self._write_buffer[total_sent:]
-
-        # while self._write_buffer:
-        #     logger.debug(f"Sent data to {type(self).__name__}")
-        #     bytes_sent = self._s.sendto(b"deadbeef" + self._write_buffer.partition(b"deadbeef")[2], self._proxy_address)
-        #     # if bytes_sent != len(self._write_buffer):
-        #     #     raise RuntimeError("Sending was fragmented, this is not supported")
-
-        #     # Reset write buffer
-        #     self._write_buffer = self._write_buffer[bytes_sent:]  # will be empty
+        for message in self._write_messages:
+            bytes_sent = self._s.sendto(message, self._proxy_address)
+            if bytes_sent != len(message):
+                raise RuntimeError("Sending was fragmented, this is not supported")
+        self._write_messages = []
 
     def ack_message(self, session_id: int, sequence_number: int):
         logger.info(f"Got ACK for session {session_id} and sequence {sequence_number}")
@@ -116,7 +105,6 @@ class ProxySocket(SelectableSocket):
             logger.debug(
                 f"Got invalid sequence number for session {session_id}, got sequence {sequence_number} instead of {self._sessions[session_id].last_acked_seq + 1}"
             )
-            raise ValueError()
 
     def read(self) -> list[DNSPacket]:
         # TODO: Needs to be non blocking
@@ -145,9 +133,8 @@ class ProxySocket(SelectableSocket):
                     logger.info(
                         f"Sending ACK for session {msg.header.session_id} and sequence {msg.header.sequence_number}"
                     )
-                    self.add_to_write_queue(
-                        create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes()
-                    )
+                    self._write_messages.append(
+                        create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes())
 
                 # Consume read bytes from buffer
                 self._read_buf = self._read_buf[len(msg) :]

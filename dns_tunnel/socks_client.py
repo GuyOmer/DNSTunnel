@@ -6,7 +6,7 @@ import socket
 
 import more_itertools
 
-from dns_tunnel.protocol import DNSPacket, MessageType, create_ack_message
+from dns_tunnel.protocol import DNSPacket, MessageType
 from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 
@@ -14,9 +14,9 @@ from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 logging.basicConfig(level=logging.DEBUG, format="Client %(module)s %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# TODO: CHange defaults
+# TODO: Change defaults
 PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")
-PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "53"))
+PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "54"))
 PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "0.0.0.0")
 PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "52"))
 
@@ -109,8 +109,6 @@ class ClientHandler:
         for client in self._clients:
             if client.session_id == session_id:
                 return client
-
-        # raise ValueError(f"Client with session id {session_id} not found")
 
     def _get_session_id(self) -> int:
         session_id = random.randint(0, 2**32)
