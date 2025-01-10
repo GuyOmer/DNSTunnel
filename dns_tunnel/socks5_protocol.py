@@ -72,6 +72,10 @@ class SOCKS5Message(metaclass=abc.ABCMeta):
     @classmethod
     @abc.abstractmethod
     def from_bytes(cls, data: bytes):
+        if not data:
+            import ipdb
+
+            ipdb.set_trace()
         if int(data[0]) != SOCKS5_VERSION:
             raise ValueError("Not a SOCKS5 message")
 

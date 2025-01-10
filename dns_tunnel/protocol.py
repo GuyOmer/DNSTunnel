@@ -5,6 +5,7 @@ import struct
 from typing import Final, Self
 
 import dns.message
+import dns.name
 import dns.query
 import dns.rdatatype
 import dns.rrset
@@ -60,13 +61,10 @@ class DNSPacketHeader:
             # data is long enough to contain the magic, but doesn't contain it
             raise InvalidSocketBuffer(f"Buffer starts with '{data[:len(cls.MAGIC)]}', are expected '{cls.MAGIC}'")
 
-        res = cls(
-            *cls._FORMATTER.unpack(
-                data[: cls._FORMATTER.size],
-            )[len(cls.MAGIC) :]
-        )
-        if res.message_type != 1 and res.message_type != 10:
-            pass
+        length, raw_message_type, session_id, sequence_number = cls._FORMATTER.unpack(data[: cls._FORMATTER.size])[
+            len(cls.MAGIC) :
+        ]
+        res = cls(length, MessageType(raw_message_type), session_id, sequence_number)
         return res
 
     def __len__(self) -> int:
@@ -79,39 +77,42 @@ class DNSPacket:
     payload: bytes
 
     MAX_PAYLOAD: Final = (
-        255  # TODO make sure this is really max UDP packet size (within MTU...) (also take into account the header size)
+        # 255  # TODO make sure this is really max UDP packet size (within MTU...) (also take into account the header size)
+        125
     )
 
     def to_bytes(self) -> bytes:
-        return self.header.to_bytes() + self.payload
+        raw = self.header.to_bytes() + self.payload
+        as_dns = create_custom_dns_query(raw)
+
+        return as_dns
 
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
-        # TODO: Need to truncate read bytes from "stream"
-        header = DNSPacketHeader.from_bytes(data)
+        dns_packet_bytes = extract_payload_from_dns_query(data)
+        header = DNSPacketHeader.from_bytes(dns_packet_bytes)
 
         header_length = len(header)
 
         try:
             # TODO: assert payload not > MAX_PAYLOAD
-            payload = data[header_length : header_length + header.payload_length]
+            payload = dns_packet_bytes[header_length : header_length + header.payload_length]
         except IndexError as e:
             raise NotEnoughDataError(
-                f"Message size is  {header_length + header.payload_length} bytes, but only {len(data)} bytes are aviliable"
+                f"Message size is  {header_length + header.payload_length} bytes, but only {len(dns_packet_bytes)} bytes are available"
             ) from e
 
         res = cls(header, payload)
         return res
 
     def __len__(self) -> int:
-        return len(self.header) + self.header.payload_length
+        return len(self.to_bytes())
 
 
-def create_custom_dns_query(domain_name: str, payload: bytes) -> bytes:
+def create_custom_dns_query(payload: bytes) -> bytes:
     """
     Creates a DNS query with a custom payload embedded in a TXT record.
 
-    :param domain_name: The domain name to query (e.g., 'example.com').
     :param payload: The custom payload to send (e.g., an 8x8 image encoded in base64).
     :return: The DNS query message.
     """
@@ -137,6 +138,32 @@ def create_custom_dns_query(domain_name: str, payload: bytes) -> bytes:
     # Convert the DNS message to wire format
     query_wire = query.to_wire()
     return query_wire
+
+
+def extract_payload_from_dns_query(query_wire: bytes) -> bytes:
+    """
+    Extracts the custom payload from a DNS query with a TXT record.
+
+    :param query_wire: The DNS query message in wire format.
+    :return: The extracted custom payload.
+    """
+    # Parse the DNS message from wire format
+    query = dns.message.from_wire(query_wire)
+
+    rrset = more_itertools.one(rrset for rrset in query.additional if rrset.rdtype == dns.rdatatype.TXT)
+
+    # Extract the base64-encoded data from the TXT record
+    base64_data = rrset[0].to_text().strip('"')
+    # Decode the base64 data to get the original payload
+    # import ipdb
+
+    # ipdb.set_trace()
+    return base64.b64decode(base64_data)
+    txt_rrset = base64.b64decode(base64_data)
+    txt_rrset_record_payload = base64.b64decode(txt_rrset.split(b" ")[-1].strip(b'"'))
+
+    payload = base64.b64decode(txt_rrset_record_payload.split()[-1])
+    return payload
 
 
 def create_ack_message(session_id: int, sequence_number: int) -> DNSPacket:

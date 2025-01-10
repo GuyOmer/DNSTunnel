@@ -69,7 +69,7 @@ class ClientHandler(BaseHandler):
                     if not client:
                         continue
 
-                    if msg.header.message_type == MessageType.ACK_MESSAGE.value:
+                    if msg.header.message_type == MessageType.ACK_MESSAGE:
                         ingress_socket.ack_message(msg.header.session_id, msg.header.sequence_number)
                         continue
 

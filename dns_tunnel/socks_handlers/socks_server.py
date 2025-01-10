@@ -91,7 +91,11 @@ class ProxyServerHandler(BaseHandler):
     def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
         logger.debug(f"Handling incoming message for session {msg.header.session_id}")
 
-        if msg.header.message_type == MessageType.ACK_MESSAGE.value:
+        # if msg.payload == b"":
+        #     import ipdb
+
+        #     ipdb.set_trace()
+        if msg.header.message_type == MessageType.ACK_MESSAGE:
             ingress.ack_message(msg.header.session_id, msg.header.sequence_number)
             logger.debug(f"ACK message for session {msg.header.session_id}, sequence {msg.header.sequence_number}")
             return

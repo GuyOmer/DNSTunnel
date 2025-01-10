@@ -54,9 +54,7 @@ class ProxySocket(SelectableSocket):
     def add_to_write_queue(self, data: bytes, session_id: int):
         session = self._sessions[session_id]
         session.sending_queue.append(
-            DNSPacket(
-                DNSPacketHeader(len(data), MessageType.NORMAL_MESSAGE, session_id, session.seq_counter), data
-            )
+            DNSPacket(DNSPacketHeader(len(data), MessageType.NORMAL_MESSAGE, session_id, session.seq_counter), data)
         )
         session.seq_counter += 1
 
@@ -119,7 +117,7 @@ class ProxySocket(SelectableSocket):
         while self._read_buf:
             try:
                 msg = DNSPacket.from_bytes(self._read_buf)
-                if msg.header.message_type == MessageType.ACK_MESSAGE.value:
+                if msg.header.message_type == MessageType.ACK_MESSAGE:
                     msgs.append(msg)
                 else:
                     if self._sessions[msg.header.session_id].last_seq_got + 1 == msg.header.sequence_number:
@@ -134,11 +132,12 @@ class ProxySocket(SelectableSocket):
                         f"Sending ACK for session {msg.header.session_id} and sequence {msg.header.sequence_number}"
                     )
                     self._write_messages.append(
-                        create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes())
+                        create_ack_message(msg.header.session_id, msg.header.sequence_number).to_bytes()
+                    )
 
                 # Consume read bytes from buffer
                 self._read_buf = self._read_buf[len(msg) :]
-            except InvalidSocketBuffer:
+            except InvalidSocketBuffer:  # TODO: change with dns parsing exceptions, and flush everything?
                 logger.debug("Invalid starting bytes in buffer, flushing them")
                 self._read_buf = (
                     self._read_buf[self._read_buf.index(DNSPacketHeader.MAGIC) :]
