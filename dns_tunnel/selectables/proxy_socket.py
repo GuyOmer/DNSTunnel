@@ -78,6 +78,7 @@ class ProxySocket(SelectableSocket):
                         f"Too many retransmission attempts for session {session.sending_queue[0].header.session_id}"
                     )
                     session.is_active = False
+                    self.end_session(session.sending_queue[0].header.session_id)
                     continue
                 else:
                     msg_to_send = session.sending_queue[0]
