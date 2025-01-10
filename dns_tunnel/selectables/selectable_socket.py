@@ -12,6 +12,9 @@ class SelectableSocket(abc.ABC):
     def fileno(self) -> int:
         return self._s.fileno()
 
+    def close(self) -> None:
+        self._s.close()
+
     @abc.abstractmethod
     def add_to_write_queue(self, data: bytes, session_id: int | None = None):
         ...

@@ -101,7 +101,7 @@ class ClientHandler(BaseHandler):
 
     def remove_edge_by_session_id(self, session_id: int):
         client = self._get_client_by_session_id(session_id)
-        client._s.close()
+        client.close()
         self._clients.remove(client)
 
     def _get_client_by_session_id(self, session_id):

@@ -82,7 +82,7 @@ class ProxyServerHandler(BaseHandler):
                     self._logger.info(f"Destination socket {dest.session_id} closed")
                     self._session_id_to_destination[dest.session_id] = None
                     ingress_socket.end_session(dest.session_id)
-                    dest._s.close()
+                    dest.close()
                     continue
 
                 self._logger.debug(f"Read {len(data)} bytes from destination socket {dest.session_id}")
