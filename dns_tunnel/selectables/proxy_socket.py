@@ -11,7 +11,7 @@ from dns_tunnel.protocol import (
     MessageType,
     NotEnoughDataError,
     PartialHeaderError,
-    create_ack_message,
+    create_ack_message, create_close_session_message,
 )
 from dns_tunnel.selectables.selectable_socket import SelectableSocket
 
@@ -57,6 +57,11 @@ class ProxySocket(SelectableSocket):
             DNSPacket(DNSPacketHeader(len(data), MessageType.NORMAL_MESSAGE, session_id, session.seq_counter), data)
         )
         session.seq_counter += 1
+
+    def end_session(self, session_id: int):
+        self._write_messages.append(
+            create_close_session_message(session_id).to_bytes()
+        )
 
     def write(self):
         pending_send = [session for session in self._sessions.values() if session.sending_queue and session.is_active]

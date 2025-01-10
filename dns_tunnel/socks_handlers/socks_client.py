@@ -11,7 +11,7 @@ from dns_tunnel.consts import (
     PROXY_SERVER_ADDRESS,
     PROXY_SERVER_PORT,
 )
-from dns_tunnel.protocol import DNSPacket, create_close_session_message
+from dns_tunnel.protocol import DNSPacket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks_handlers.base_handler import BaseHandler
 
@@ -81,10 +81,7 @@ class ClientHandler(BaseHandler):
                 if not data:
                     self._logger.info(f"Client {read_ready_client.session_id} closed")
                     self._clients.remove(read_ready_client)
-                    ingress_socket.add_to_write_queue(
-                        create_close_session_message(read_ready_client.session_id).to_bytes(),
-                        read_ready_client.session_id,
-                    )
+                    ingress_socket.end_session(read_ready_client.session_id)
                     continue
 
                 self._logger.debug(f"Read data from client {read_ready_client.session_id}: {data}")

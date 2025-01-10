@@ -12,7 +12,7 @@ from dns_tunnel.consts import (
     PROXY_SERVER_ADDRESS,
     PROXY_SERVER_PORT,
 )
-from dns_tunnel.protocol import DNSPacket, MessageType, create_close_session_message
+from dns_tunnel.protocol import DNSPacket, MessageType
 from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks5_protocol import (
@@ -81,9 +81,7 @@ class ProxyServerHandler(BaseHandler):
                 if not data:
                     self._logger.info(f"Destination socket {dest.session_id} closed")
                     self._session_id_to_destination[dest.session_id] = None
-                    ingress_socket.add_to_write_queue(
-                        create_close_session_message(dest.session_id).to_bytes(), dest.session_id
-                    )
+                    ingress_socket.end_session(dest.session_id)
                     dest._s.close()
                     continue
 
