@@ -40,14 +40,12 @@ class ProxyServerHandler:
     def __init__(self):
         self._rlist = []
         self._wlist = []
-        # self._destinations: list[TCPClientSocket] = []
 
         self._session_id_to_destination: dict[int, TCPClientSocket] = {}
         self._session_id_to_socks5_handshake_state: dict[int, SOCKS5HandshakeState] = {}
 
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # s.listen(5)
         s.bind(("0.0.0.0", PROXY_SERVER_PORT))
         ingress_socket = ProxySocket(
             s,
