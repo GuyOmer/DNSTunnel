@@ -4,6 +4,7 @@ from logging import Logger
 
 from dns_tunnel.protocol import DNSPacket, MessageType
 from dns_tunnel.selectables.proxy_socket import ProxySocket
+from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 
 
 class BaseHandler(abc.ABC):
@@ -13,31 +14,52 @@ class BaseHandler(abc.ABC):
         self._logger = logger
 
     @abc.abstractmethod
-    def run(self): ...
+    def run(self) -> None: ...
 
     @property
     @abc.abstractmethod
-    def address(self): ...
+    def address(self) -> str: ...
 
     @property
     @abc.abstractmethod
-    def port(self): ...
+    def port(self) -> int: ...
+
+    @property
+    @abc.abstractmethod
+    def edges(self) -> list[TCPClientSocket]: ...
 
     @abc.abstractmethod
-    def get_edge_by_session_id(self, session_id): ...
+    def get_edge_by_session_id(self, session_id) -> TCPClientSocket: ...
 
     @abc.abstractmethod
     def remove_edge_by_session_id(self, session_id: int) -> None: ...
 
     def init_ingress_socket(self, address: str, port: int) -> ProxySocket:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.bind((self.address(), self.port()))
+        s.bind((self.address, self.port))
         return ProxySocket(
             s,
             (address, port),
         )
 
-    def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
+    def init_wlist(self, ingress_socket: ProxySocket) -> None:
+        self._wlist = [edge for edge in self.edges if edge and edge.needs_to_write()]
+        if ingress_socket.needs_to_write():
+            self._wlist.append(ingress_socket)
+
+    def handle_ingress_socket_read(self, ingress_socket: ProxySocket, r_ready: list, w_ready: list):
+        if ingress_socket in r_ready:
+            msgs = ingress_socket.read()
+            for msg in msgs:
+                self._handle_incoming_ingress_message(ingress_socket, msg)
+
+    @staticmethod
+    def write_wlist(wlist: list) -> None:
+        for w in wlist:
+            if isinstance(w, (ProxySocket, TCPClientSocket)):
+                w.write()
+
+    def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket) -> None:
         self._logger.debug(f"Handling incoming message for session {msg.header.session_id}")
 
         if msg.header.message_type == MessageType.ACK_MESSAGE:

@@ -29,11 +29,17 @@ class ClientHandler(BaseHandler):
         self._clients: list[TCPClientSocket] = []
         self._used_session_ids = set()
 
+    @property
     def address(self):
         return PROXY_CLIENT_ADDRESS
 
+    @property
     def port(self):
         return PROXY_CLIENT_PORT
+
+    @property
+    def edges(self):
+        return self._clients
 
     def run(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -45,14 +51,7 @@ class ClientHandler(BaseHandler):
         self._rlist = [server_socket]  # On startup - only listen for new server clients
 
         while True:
-            self._wlist = []
-            if ingress_socket.needs_to_write():
-                self._wlist.append(ingress_socket)
-
-            for client in self._clients:
-                if client.needs_to_write():
-                    self._wlist.append(client)
-
+            self.init_wlist(ingress_socket)
             self._rlist = [server_socket, ingress_socket] + self._clients
 
             r_ready, w_ready, _ = select.select(self._rlist, self._wlist, [])
@@ -68,10 +67,7 @@ class ClientHandler(BaseHandler):
                     )
                 )
 
-            if ingress_socket in r_ready:
-                msgs = ingress_socket.read()
-                for msg in msgs:
-                    self._handle_incoming_ingress_message(ingress_socket, msg)
+            self.handle_ingress_socket_read(ingress_socket, r_ready, w_ready)
 
             # Read from tcp clients, and queue messages for sending
             read_ready_clients = [ready for ready in r_ready if ready in self._clients]
@@ -94,8 +90,7 @@ class ClientHandler(BaseHandler):
                 write_ready_client.write()
                 self._logger.debug(f"Sent data for client {write_ready_client.session_id}")
 
-            if ingress_socket in w_ready:
-                ingress_socket.write()
+            self.write_wlist(w_ready)
 
     def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket:
         return self._get_client_by_session_id(session_id)

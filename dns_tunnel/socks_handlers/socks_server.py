@@ -42,11 +42,17 @@ class ProxyServerHandler(BaseHandler):
         self._session_id_to_destination: dict[int, TCPClientSocket | None] = {}
         self._session_id_to_socks5_handshake_state: dict[int, SOCKS5HandshakeState] = {}
 
+    @property
     def address(self):
         return PROXY_SERVER_ADDRESS
 
+    @property
     def port(self):
         return PROXY_SERVER_PORT
+
+    @property
+    def edges(self):
+        return self._session_id_to_destination.values()
 
     def run(self):
         ingress_socket = self.init_ingress_socket(PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT)
@@ -54,23 +60,10 @@ class ProxyServerHandler(BaseHandler):
 
         while True:
             self._rlist = [ingress_socket] + [d for d in self._session_id_to_destination.values() if d]
-
-            self._wlist = []
-            if ingress_socket.needs_to_write():
-                self._wlist.append(ingress_socket)
-
-            for dest in self._session_id_to_destination.values():
-                if dest and dest.needs_to_write():
-                    self._wlist.append(dest)
+            self.init_wlist(ingress_socket)
 
             r_ready, w_ready, _ = select.select(self._rlist, self._wlist, [])
-
-            if ingress_socket in r_ready:
-                msgs = ingress_socket.read()
-                self._logger.debug(f"Received {len(msgs)} messages from ingress socket")
-
-                for msg in msgs:
-                    self._handle_incoming_ingress_message(ingress_socket, msg)
+            self.handle_ingress_socket_read(ingress_socket, r_ready, w_ready)
 
             for dest in cast(
                 Iterable[TCPClientSocket],
@@ -89,9 +82,7 @@ class ProxyServerHandler(BaseHandler):
                 for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
                     ingress_socket.add_to_write_queue(bytes(chunk), dest.session_id)
 
-            for w in w_ready:
-                if isinstance(w, (ProxySocket, TCPClientSocket)):
-                    w.write()
+            self.write_wlist(w_ready)
 
     def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket:
         return self._session_id_to_destination.get(session_id)
