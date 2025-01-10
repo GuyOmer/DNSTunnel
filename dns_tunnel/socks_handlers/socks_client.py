@@ -5,10 +5,6 @@ import socket
 
 import more_itertools
 
-<<<<<<< Updated upstream
-from dns_tunnel.consts import PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT, PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT
-from dns_tunnel.protocol import DNSPacket
-=======
 from dns_tunnel.consts import (
     PROXY_CLIENT_ADDRESS,
     PROXY_CLIENT_PORT,
@@ -16,7 +12,6 @@ from dns_tunnel.consts import (
     PROXY_SERVER_PORT,
 )
 from dns_tunnel.protocol import DNSPacket, MessageType
->>>>>>> Stashed changes
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks_handlers.base_handler import BaseHandler
 
@@ -75,25 +70,7 @@ class ClientHandler(BaseHandler):
             if ingress_socket in r_ready:
                 msgs = ingress_socket.read()
                 for msg in msgs:
-<<<<<<< Updated upstream
                     self._handle_incoming_ingress_message(ingress_socket, msg)
-=======
-                    client = self._get_client_by_session_id(msg.header.session_id)
-                    if not client:
-                        continue
-
-                    if msg.header.message_type == MessageType.ACK_MESSAGE:
-                        ingress_socket.ack_message(msg.header.session_id, msg.header.sequence_number)
-                        continue
-
-                    if msg.header.message_type == MessageType.CLOSE_SESSION:
-                        client._s.close()
-                        self._clients.remove(client)
-                        continue
-
-                    client.add_to_write_queue(msg.payload)
-                    logger.debug(f"Queued message for client {client.session_id}: {msg.payload}")
->>>>>>> Stashed changes
 
             # Read from tcp clients, and queue messages for sending
             read_ready_clients = [ready for ready in r_ready if ready in self._clients]

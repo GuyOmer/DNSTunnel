@@ -13,26 +13,21 @@ class BaseHandler(abc.ABC):
         self._logger = logger
 
     @abc.abstractmethod
-    def run(self):
-        ...
+    def run(self): ...
 
     @property
     @abc.abstractmethod
-    def address(self):
-        ...
+    def address(self): ...
 
     @property
     @abc.abstractmethod
-    def port(self):
-        ...
+    def port(self): ...
 
     @abc.abstractmethod
-    def get_edge_by_session_id(self, session_id):
-        ...
+    def get_edge_by_session_id(self, session_id): ...
 
     @abc.abstractmethod
-    def remove_edge_by_session_id(self, session_id: int) -> None:
-        ...
+    def remove_edge_by_session_id(self, session_id: int) -> None: ...
 
     def init_ingress_socket(self, address: str, port: int) -> ProxySocket:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -47,7 +42,14 @@ class BaseHandler(abc.ABC):
 
         if msg.header.message_type == MessageType.ACK_MESSAGE:
             ingress.ack_message(msg.header.session_id, msg.header.sequence_number)
-            self._logger.debug(f"ACK message for session {msg.header.session_id}, sequence {msg.header.sequence_number}")
+            self._logger.debug(
+                f"ACK message for session {msg.header.session_id}, sequence {msg.header.sequence_number}"
+            )
+            return
+
+        if msg.header.message_type == MessageType.CLOSE_SESSION:
+            self._logger.info(f"Closing session {msg.header.session_id}")
+            self.remove_edge_by_session_id(msg.header.session_id)
             return
 
         edge = self.get_edge_by_session_id(msg.header.session_id)
