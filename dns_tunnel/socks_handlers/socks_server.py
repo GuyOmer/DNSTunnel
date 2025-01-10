@@ -80,7 +80,6 @@ class ProxyServerHandler(BaseHandler):
 
                 if not data:
                     self._logger.info(f"Destination socket {dest.session_id} closed")
-                    # del self._session_id_to_destination[dest.session_id]
                     self._session_id_to_destination[dest.session_id] = None
                     ingress_socket.add_to_write_queue(
                         create_close_session_message(dest.session_id).to_bytes(), dest.session_id
