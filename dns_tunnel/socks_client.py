@@ -96,7 +96,7 @@ class ClientHandler:
 
                 logger.debug(f"Read data from client {read_ready_client.session_id}: {data}")
                 for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
-                    ingress_socket.add_dns_packet_to_write_queue(bytes(chunk), read_ready_client.session_id)
+                    ingress_socket.add_to_write_queue(bytes(chunk), read_ready_client.session_id)
 
             write_ready_clients = [ready for ready in w_ready if ready in self._clients]
             for write_ready_client in write_ready_clients:

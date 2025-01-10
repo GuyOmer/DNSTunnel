@@ -89,7 +89,7 @@ class ProxyServerHandler:
 
                 logger.debug(f"Read {len(data)} bytes from destination socket {dest.session_id}")
                 for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
-                    ingress_socket.add_dns_packet_to_write_queue(bytes(chunk), dest.session_id)
+                    ingress_socket.add_to_write_queue(bytes(chunk), dest.session_id)
 
             for w in w_ready:
                 if isinstance(w, (ProxySocket, TCPClientSocket)):
@@ -118,7 +118,7 @@ class ProxyServerHandler:
                     logger.error("Only no-auth is supported")
                     raise ValueError("Only no-auth is supported")
 
-                ingress.add_dns_packet_to_write_queue(
+                ingress.add_to_write_queue(
                     SOCKS5GreetingResponse(SOCKS5AuthMethod.NO_AUTH).to_bytes(),
                     msg.header.session_id,
                 )
@@ -146,7 +146,7 @@ class ProxyServerHandler:
                                     raise ConnectionRefusedError("Connection refused")
                         except (socket.gaierror, ConnectionRefusedError, BlockingIOError) as e:
                             logger.error(f"Failed to connect to {command_msg.address}:{command_msg.port} with {e}")
-                            ingress.add_dns_packet_to_write_queue(
+                            ingress.add_to_write_queue(
                                 SOCKS5DNSConnectResponse(
                                     SOCKS5ConnectRequestStatus.HOST_UNREACHABLE,
                                     command_msg.address,
@@ -162,7 +162,7 @@ class ProxyServerHandler:
                         self._session_id_to_destination[msg.header.session_id] = TCPClientSocket(
                             dest_sock, msg.header.session_id
                         )
-                        ingress.add_dns_packet_to_write_queue(
+                        ingress.add_to_write_queue(
                             SOCKS5DNSConnectResponse(
                                 SOCKS5ConnectRequestStatus.GRANTED, command_msg.address, command_msg.port
                             ).to_bytes(),

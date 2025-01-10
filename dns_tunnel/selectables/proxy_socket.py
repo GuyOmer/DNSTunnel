@@ -51,11 +51,11 @@ class ProxySocket(SelectableSocket):
                 return True
         return False
 
-    def add_dns_packet_to_write_queue(self, payload: bytes, session_id: int):
+    def add_to_write_queue(self, data: bytes, session_id: int):
         session = self._sessions[session_id]
         session.sending_queue.append(
             DNSPacket(
-                DNSPacketHeader(len(payload), MessageType.NORMAL_MESSAGE, session_id, session.seq_counter), payload
+                DNSPacketHeader(len(data), MessageType.NORMAL_MESSAGE, session_id, session.seq_counter), data
             )
         )
         session.seq_counter += 1
