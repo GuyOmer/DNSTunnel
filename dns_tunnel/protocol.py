@@ -139,26 +139,6 @@ def create_custom_dns_query(domain_name: str, payload: bytes) -> bytes:
     return query_wire
 
 
-# def send_custom_dns_query(server_ip: str, domain_name: str, payload: bytes) -> None:
-#     """
-#     Sends a DNS query with a custom payload to the specified server.
-
-#     :param server_ip: The IP address of the DNS server (e.g., '8.8.8.8').
-#     :param domain_name: The domain name to query.
-#     :param payload: The custom payload to send.
-#     """
-#     # Create the DNS query message with the custom payload
-#     dns_query = create_custom_dns_query(domain_name, payload)
-
-#     print(f"Sending custom DNS query with payload to {server_ip}")
-
-#     # Send the query and receive the response
-#     response = dns.query.udp(dns_query, server_ip)
-
-#     print(f"Received response:")
-#     print(response)
-
-
 def create_ack_message(session_id: int, sequence_number: int) -> DNSPacket:
     return DNSPacket(
         DNSPacketHeader(
