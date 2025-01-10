@@ -1,0 +1,7 @@
+import os
+
+# TODO: Change defaults
+PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")
+PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "54"))
+PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "0.0.0.0")
+PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "52"))

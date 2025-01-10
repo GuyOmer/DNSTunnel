@@ -1,12 +1,12 @@
 import enum
 import logging
-import os
 import select
 import socket
 from typing import Iterable, cast
 
 import more_itertools
 
+from dns_tunnel.consts import PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT, PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT
 from dns_tunnel.protocol import DNSPacket, MessageType
 from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
@@ -20,11 +20,6 @@ from dns_tunnel.socks5_protocol import (
     SOCKS5GreetingResponse,
 )
 from dns_tunnel.socks_handlers.base_handler import BaseHandler
-
-PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")
-PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "54"))
-PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "0.0.0.0")
-PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "52"))
 
 
 # Initialize logger

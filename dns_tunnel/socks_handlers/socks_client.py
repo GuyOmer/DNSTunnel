@@ -1,11 +1,11 @@
 import logging
-import os
 import random
 import select
 import socket
 
 import more_itertools
 
+from dns_tunnel.consts import PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT, PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT
 from dns_tunnel.protocol import DNSPacket, MessageType
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks_handlers.base_handler import BaseHandler
@@ -13,12 +13,6 @@ from dns_tunnel.socks_handlers.base_handler import BaseHandler
 # Initialize logger
 logging.basicConfig(level=logging.DEBUG, format="Client %(module)s %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
-
-# TODO: Change defaults
-PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")
-PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "54"))
-PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "0.0.0.0")
-PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "52"))
 
 
 class ClientHandler(BaseHandler):
