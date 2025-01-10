@@ -91,6 +91,9 @@ class ProxyServerHandler(BaseHandler):
     def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket:
         return self._session_id_to_destination.get(session_id)
 
+    def remove_edge_by_session_id(self, session_id: int) -> None:
+        ...
+
     def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
         logger.debug(f"Handling incoming message for session {msg.header.session_id}")
 

@@ -92,6 +92,9 @@ class ClientHandler(BaseHandler):
     def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket:
         return self._get_client_by_session_id(session_id)
 
+    def remove_edge_by_session_id(self, session_id: int) -> None:
+        ...
+
     def _get_client_by_session_id(self, session_id):
         for client in self._clients:
             if client.session_id == session_id:

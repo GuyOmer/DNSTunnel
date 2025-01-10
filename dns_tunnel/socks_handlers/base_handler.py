@@ -30,6 +30,10 @@ class BaseHandler(abc.ABC):
     def get_edge_by_session_id(self, session_id):
         ...
 
+    @abc.abstractmethod
+    def remove_edge_by_session_id(self, session_id: int) -> None:
+        ...
+
     def init_ingress_socket(self, address: str, port: int) -> ProxySocket:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.bind((self.address(), self.port()))
