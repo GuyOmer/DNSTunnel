@@ -155,15 +155,7 @@ def extract_payload_from_dns_query(query_wire: bytes) -> bytes:
     # Extract the base64-encoded data from the TXT record
     base64_data = rrset[0].to_text().strip('"')
     # Decode the base64 data to get the original payload
-    # import ipdb
-
-    # ipdb.set_trace()
     return base64.b64decode(base64_data)
-    txt_rrset = base64.b64decode(base64_data)
-    txt_rrset_record_payload = base64.b64decode(txt_rrset.split(b" ")[-1].strip(b'"'))
-
-    payload = base64.b64decode(txt_rrset_record_payload.split()[-1])
-    return payload
 
 
 def create_ack_message(session_id: int, sequence_number: int) -> DNSPacket:
