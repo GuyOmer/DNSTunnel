@@ -108,7 +108,6 @@ class ProxySocket(SelectableSocket):
         # TODO: Needs to be non blocking
         data = self._s.recv(2**10)
         if len(data) == 0:
-            # TODO: This means the socket closed?
             return []
 
         self._read_buf += data

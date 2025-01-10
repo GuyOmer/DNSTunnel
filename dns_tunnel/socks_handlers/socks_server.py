@@ -6,8 +6,13 @@ from typing import Iterable, cast
 
 import more_itertools
 
-from dns_tunnel.consts import PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT, PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT
-from dns_tunnel.protocol import DNSPacket, MessageType
+from dns_tunnel.consts import (
+    PROXY_CLIENT_ADDRESS,
+    PROXY_CLIENT_PORT,
+    PROXY_SERVER_ADDRESS,
+    PROXY_SERVER_PORT,
+)
+from dns_tunnel.protocol import DNSPacket, MessageType, create_close_session_message
 from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks5_protocol import (
@@ -20,7 +25,6 @@ from dns_tunnel.socks5_protocol import (
     SOCKS5GreetingResponse,
 )
 from dns_tunnel.socks_handlers.base_handler import BaseHandler
-
 
 # Initialize logger
 logging.basicConfig(level=logging.DEBUG, format="Server %(module)s %(levelname)s: %(message)s")
@@ -78,6 +82,10 @@ class ProxyServerHandler(BaseHandler):
                     self._logger.info(f"Destination socket {dest.session_id} closed")
                     # del self._session_id_to_destination[dest.session_id]
                     self._session_id_to_destination[dest.session_id] = None
+                    ingress_socket.add_to_write_queue(
+                        create_close_session_message(dest.session_id).to_bytes(), dest.session_id
+                    )
+                    dest._s.close()
                     continue
 
                 self._logger.debug(f"Read {len(data)} bytes from destination socket {dest.session_id}")
@@ -92,18 +100,20 @@ class ProxyServerHandler(BaseHandler):
         return self._session_id_to_destination.get(session_id)
 
     def remove_edge_by_session_id(self, session_id: int) -> None:
-        ...
+        logger.info(f"Closing session {session_id}")
+        del self._session_id_to_destination[session_id]
+        del self._session_id_to_socks5_handshake_state[session_id]
 
     def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
         logger.debug(f"Handling incoming message for session {msg.header.session_id}")
 
-        # if msg.payload == b"":
-        #     import ipdb
-
-        #     ipdb.set_trace()
         if msg.header.message_type == MessageType.ACK_MESSAGE:
             ingress.ack_message(msg.header.session_id, msg.header.sequence_number)
             logger.debug(f"ACK message for session {msg.header.session_id}, sequence {msg.header.sequence_number}")
+            return
+
+        if msg.header.message_type == MessageType.CLOSE_SESSION:
+            self.remove_edge_by_session_id(msg.header.session_id)
             return
 
         # Handle the message
@@ -143,10 +153,10 @@ class ProxyServerHandler(BaseHandler):
                         try:
                             try:
                                 dest_sock.connect((command_msg.address, command_msg.port))
-                            except BlockingIOError:
+                            except BlockingIOError as e:
                                 _, connected, __ = select.select([], [dest_sock], [], 0.4)
                                 if not connected:
-                                    raise ConnectionRefusedError("Connection refused")
+                                    raise ConnectionRefusedError("Connection refused") from e
                         except (socket.gaierror, ConnectionRefusedError, BlockingIOError) as e:
                             logger.error(f"Failed to connect to {command_msg.address}:{command_msg.port} with {e}")
                             ingress.add_to_write_queue(

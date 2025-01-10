@@ -15,7 +15,8 @@ import more_itertools
 @enum.unique
 class MessageType(enum.Enum):
     NORMAL_MESSAGE = 1
-    ACK_MESSAGE = 10
+    ACK_MESSAGE = 2
+    CLOSE_SESSION = 3
 
 
 class DNSPacketError(Exception): ...
@@ -165,6 +166,18 @@ def create_ack_message(session_id: int, sequence_number: int) -> DNSPacket:
             MessageType.ACK_MESSAGE,
             session_id,
             sequence_number,  # When ACK-ing, use the sequence number we are ACK-ing
+        ),
+        b"",
+    )
+
+
+def create_close_session_message(session_id: int) -> DNSPacket:
+    return DNSPacket(
+        DNSPacketHeader(
+            0,
+            MessageType.CLOSE_SESSION,
+            session_id,
+            0,
         ),
         b"",
     )
