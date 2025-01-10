@@ -40,8 +40,8 @@ class DNSPacketHeader:
     session_id: int
     sequence_number: int
 
-    MAGIC: Final = b"deadbeef"  # TODO: Make sure this makes sense
-    _HEADER_FMT = f"!{len(MAGIC)}bIBII"  # TODO: make sure this is correct
+    MAGIC: Final = b"deadbeef"
+    _HEADER_FMT = f"!{len(MAGIC)}bIBII"
     _FORMATTER = struct.Struct(_HEADER_FMT)
 
     def to_bytes(self) -> bytes:
@@ -78,7 +78,6 @@ class DNSPacket:
     payload: bytes
 
     MAX_PAYLOAD: Final = (
-        # 255  # TODO make sure this is really max UDP packet size (within MTU...) (also take into account the header size)
         125
     )
 
@@ -96,7 +95,6 @@ class DNSPacket:
         header_length = len(header)
 
         try:
-            # TODO: assert payload not > MAX_PAYLOAD
             payload = dns_packet_bytes[header_length: header_length + header.payload_length]
         except IndexError as e:
             raise NotEnoughDataError(

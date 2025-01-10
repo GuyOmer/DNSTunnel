@@ -116,7 +116,6 @@ class ProxySocket(SelectableSocket):
             self._sessions[session_id].is_active = False
 
     def read(self) -> list[DNSPacket]:
-        # TODO: Needs to be non blocking
         data = self._s.recv(2**10)
         if len(data) == 0:
             return []
@@ -147,7 +146,7 @@ class ProxySocket(SelectableSocket):
 
                 # Consume read bytes from buffer
                 self._read_buf = self._read_buf[len(msg):]
-            except InvalidSocketBuffer:  # TODO: change with dns parsing exceptions, and flush everything?
+            except InvalidSocketBuffer:
                 logger.debug("Invalid starting bytes in buffer, flushing them")
                 self._read_buf = b""
                 continue

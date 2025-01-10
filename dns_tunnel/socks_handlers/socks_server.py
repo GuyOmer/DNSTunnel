@@ -76,7 +76,7 @@ class ProxyServerHandler(BaseHandler):
                 Iterable[TCPClientSocket],
                 [r for r in r_ready if r in self._session_id_to_destination.values()],
             ):
-                data = dest.read()  # TODO: Need to be real TCP read
+                data = dest.read()
 
                 if not data:
                     self._logger.info(f"Destination socket {dest.session_id} closed")
