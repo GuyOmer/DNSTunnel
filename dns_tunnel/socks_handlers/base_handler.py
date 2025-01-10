@@ -1,6 +1,8 @@
 import abc
+import itertools
 import socket
 from logging import Logger
+import more_itertools
 
 from dns_tunnel.protocol import DNSPacket, MessageType
 from dns_tunnel.selectables.proxy_socket import ProxySocket
@@ -26,6 +28,10 @@ class BaseHandler(abc.ABC):
 
     @property
     @abc.abstractmethod
+    def ingress_socket(self) -> ProxySocket: ...
+
+    @property
+    @abc.abstractmethod
     def edges(self) -> list[TCPClientSocket]: ...
 
     @abc.abstractmethod
@@ -42,28 +48,44 @@ class BaseHandler(abc.ABC):
             (address, port),
         )
 
-    def init_wlist(self, ingress_socket: ProxySocket) -> None:
+    def init_wlist(self) -> None:
         self._wlist = [edge for edge in self.edges if edge and edge.needs_to_write()]
-        if ingress_socket.needs_to_write():
-            self._wlist.append(ingress_socket)
+        if self.ingress_socket.needs_to_write():
+            self._wlist.append(self.ingress_socket)
 
-    def handle_ingress_socket_read(self, ingress_socket: ProxySocket, r_ready: list, w_ready: list):
-        if ingress_socket in r_ready:
-            msgs = ingress_socket.read()
+    def handle_ingress_socket_read(self, r_ready: list):
+        if self.ingress_socket in r_ready:
+            msgs = self.ingress_socket.read()
             for msg in msgs:
-                self._handle_incoming_ingress_message(ingress_socket, msg)
+                self._handle_incoming_ingress_message(msg)
 
-    @staticmethod
-    def write_wlist(wlist: list) -> None:
-        for w in wlist:
-            if isinstance(w, (ProxySocket, TCPClientSocket)):
-                w.write()
+    def handle_read_edges(self, r_ready: list):
+        # Read from tcp clients, and queue messages for sending
+        read_ready_clients = [ready for ready in r_ready if ready in self.edges]
+        for read_ready_client in read_ready_clients:
+            # read as much as possible, non blocking
+            data = read_ready_client.read()
 
-    def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket) -> None:
+            if not data:
+                self._logger.info(f"Client {read_ready_client.session_id} closed")
+                self.remove_edge_by_session_id(read_ready_client.session_id)
+                self.ingress_socket.end_session(read_ready_client.session_id)
+                continue
+
+            self._logger.debug(f"Read data from client {read_ready_client.session_id}: {data}")
+            for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
+                self.ingress_socket.add_to_write_queue(bytes(chunk), read_ready_client.session_id)
+
+    def write_wlist(self, wlist: list) -> None:
+        write_ready = [ready for ready in wlist if ready and ready in itertools.chain(self.edges, [self.ingress_socket])]
+        for w in write_ready:
+            w.write()
+
+    def _handle_incoming_ingress_message(self, msg: DNSPacket) -> None:
         self._logger.debug(f"Handling incoming message for session {msg.header.session_id}")
 
         if msg.header.message_type == MessageType.ACK_MESSAGE:
-            ingress.ack_message(msg.header.session_id, msg.header.sequence_number)
+            self.ingress_socket.ack_message(msg.header.session_id, msg.header.sequence_number)
             self._logger.debug(
                 f"ACK message for session {msg.header.session_id}, sequence {msg.header.sequence_number}"
             )
@@ -71,7 +93,7 @@ class BaseHandler(abc.ABC):
 
         if msg.header.message_type == MessageType.CLOSE_SESSION:
             self._logger.info(f"Closing session {msg.header.session_id}")
-            ingress.remove_session(msg.header.session_id)
+            self.ingress_socket.remove_session(msg.header.session_id)
             self.remove_edge_by_session_id(msg.header.session_id)
             return
 

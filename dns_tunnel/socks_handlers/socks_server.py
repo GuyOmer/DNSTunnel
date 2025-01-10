@@ -2,9 +2,6 @@ import enum
 import logging
 import select
 import socket
-from typing import Iterable, cast
-
-import more_itertools
 
 from dns_tunnel.consts import (
     PROXY_CLIENT_ADDRESS,
@@ -41,6 +38,7 @@ class ProxyServerHandler(BaseHandler):
         super().__init__(logger)
         self._session_id_to_destination: dict[int, TCPClientSocket | None] = {}
         self._session_id_to_socks5_handshake_state: dict[int, SOCKS5HandshakeState] = {}
+        self._ingress_socket = self.init_ingress_socket(PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT)
 
     @property
     def address(self):
@@ -51,37 +49,23 @@ class ProxyServerHandler(BaseHandler):
         return PROXY_SERVER_PORT
 
     @property
+    def ingress_socket(self) -> ProxySocket:
+        return self._ingress_socket
+
+    @property
     def edges(self):
         return self._session_id_to_destination.values()
 
     def run(self):
-        ingress_socket = self.init_ingress_socket(PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT)
         self._logger.info("Proxy server started and listening for connections")
 
         while True:
-            self._rlist = [ingress_socket] + [d for d in self._session_id_to_destination.values() if d]
-            self.init_wlist(ingress_socket)
+            self._rlist = [self.ingress_socket] + [d for d in self._session_id_to_destination.values() if d]
+            self.init_wlist()
 
             r_ready, w_ready, _ = select.select(self._rlist, self._wlist, [])
-            self.handle_ingress_socket_read(ingress_socket, r_ready, w_ready)
-
-            for dest in cast(
-                Iterable[TCPClientSocket],
-                [r for r in r_ready if r in self._session_id_to_destination.values()],
-            ):
-                data = dest.read()
-
-                if not data:
-                    self._logger.info(f"Destination socket {dest.session_id} closed")
-                    self._session_id_to_destination[dest.session_id] = None
-                    ingress_socket.end_session(dest.session_id)
-                    dest.close()
-                    continue
-
-                self._logger.debug(f"Read {len(data)} bytes from destination socket {dest.session_id}")
-                for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
-                    ingress_socket.add_to_write_queue(bytes(chunk), dest.session_id)
-
+            self.handle_ingress_socket_read(r_ready)
+            self.handle_read_edges(r_ready)
             self.write_wlist(w_ready)
 
     def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket:
@@ -91,16 +75,16 @@ class ProxyServerHandler(BaseHandler):
         logger.info(f"Closing session {session_id}")
         self._session_id_to_destination[session_id] = None
 
-    def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
+    def _handle_incoming_ingress_message(self, msg: DNSPacket):
         if (msg.header.message_type == MessageType.NORMAL_MESSAGE and
                 msg.header.session_id not in self._session_id_to_destination):
             logger.debug(f"Handling incoming message for session {msg.header.session_id}")
-            self._handle_socks5_handshake(ingress, msg)
+            self._handle_socks5_handshake(msg)
             return
 
-        super()._handle_incoming_ingress_message(ingress, msg)
+        super()._handle_incoming_ingress_message(msg)
 
-    def _handle_socks5_handshake(self, ingress: ProxySocket, msg: DNSPacket):
+    def _handle_socks5_handshake(self, msg: DNSPacket):
         # Session is still in SOCKS5 handshake phase
         logger.debug(f"Session {msg.header.session_id} in SOCKS5 handshake phase")
 
@@ -114,7 +98,7 @@ class ProxyServerHandler(BaseHandler):
                 logger.error("Only no-auth is supported")
                 raise ValueError("Only no-auth is supported")
 
-            ingress.add_to_write_queue(
+            self.ingress_socket.add_to_write_queue(
                 SOCKS5GreetingResponse(SOCKS5AuthMethod.NO_AUTH).to_bytes(),
                 msg.header.session_id,
             )
@@ -142,7 +126,7 @@ class ProxyServerHandler(BaseHandler):
                                 raise ConnectionRefusedError("Connection refused") from e
                     except (socket.gaierror, ConnectionRefusedError, BlockingIOError) as e:
                         logger.error(f"Failed to connect to {command_msg.address}:{command_msg.port} with {e}")
-                        ingress.add_to_write_queue(
+                        self.ingress_socket.add_to_write_queue(
                             SOCKS5DNSConnectResponse(
                                 SOCKS5ConnectRequestStatus.HOST_UNREACHABLE,
                                 command_msg.address,
@@ -159,7 +143,7 @@ class ProxyServerHandler(BaseHandler):
                     self._session_id_to_destination[msg.header.session_id] = TCPClientSocket(
                         dest_sock, msg.header.session_id
                     )
-                    ingress.add_to_write_queue(
+                    self.ingress_socket.add_to_write_queue(
                         SOCKS5DNSConnectResponse(
                             SOCKS5ConnectRequestStatus.GRANTED, command_msg.address, command_msg.port
                         ).to_bytes(),
