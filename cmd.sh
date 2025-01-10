@@ -19,4 +19,4 @@
   --disable-breakpad \
   --disable-features=OptimizationHints,Translate,ChromeWhatsNew \
   --user-data-dir=$(mktemp -d) \
-  https://test-endpoint/index.html
+  https://google.com

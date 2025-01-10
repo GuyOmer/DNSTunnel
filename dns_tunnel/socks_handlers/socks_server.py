@@ -33,8 +33,8 @@ class SOCKS5HandshakeState(enum.Enum):
 
 
 class ProxyServerHandler(BaseHandler):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, logger: logging.Logger):
+        super().__init__(logger)
         self._session_id_to_destination: dict[int, TCPClientSocket] = {}
         self._session_id_to_socks5_handshake_state: dict[int, SOCKS5HandshakeState] = {}
 
@@ -46,7 +46,7 @@ class ProxyServerHandler(BaseHandler):
 
     def run(self):
         ingress_socket = self.init_ingress_socket(PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT)
-        logger.info("Proxy server started and listening for connections")
+        self._logger.info("Proxy server started and listening for connections")
 
         while True:
             self._rlist = [ingress_socket] + [d for d in self._session_id_to_destination.values() if d]
@@ -63,7 +63,7 @@ class ProxyServerHandler(BaseHandler):
 
             if ingress_socket in r_ready:
                 msgs = ingress_socket.read()
-                logger.debug(f"Received {len(msgs)} messages from ingress socket")
+                self._logger.debug(f"Received {len(msgs)} messages from ingress socket")
 
                 for msg in msgs:
                     self._handle_incoming_ingress_message(ingress_socket, msg)
@@ -75,18 +75,21 @@ class ProxyServerHandler(BaseHandler):
                 data = dest.read()  # TODO: Need to be real TCP read
 
                 if not data:
-                    logger.info(f"Destination socket {dest.session_id} closed")
+                    self._logger.info(f"Destination socket {dest.session_id} closed")
                     # del self._session_id_to_destination[dest.session_id]
                     self._session_id_to_destination[dest.session_id] = None
                     continue
 
-                logger.debug(f"Read {len(data)} bytes from destination socket {dest.session_id}")
+                self._logger.debug(f"Read {len(data)} bytes from destination socket {dest.session_id}")
                 for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
                     ingress_socket.add_to_write_queue(bytes(chunk), dest.session_id)
 
             for w in w_ready:
                 if isinstance(w, (ProxySocket, TCPClientSocket)):
                     w.write()
+
+    def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket:
+        return self._session_id_to_destination.get(session_id)
 
     def _handle_incoming_ingress_message(self, ingress: ProxySocket, msg: DNSPacket):
         logger.debug(f"Handling incoming message for session {msg.header.session_id}")
@@ -184,4 +187,4 @@ class ProxyServerHandler(BaseHandler):
 
 
 if __name__ == "__main__":
-    ProxyServerHandler().run()
+    ProxyServerHandler(logger).run()
