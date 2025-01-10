@@ -1,17 +1,4 @@
-import enum
-
 from dns_tunnel.selectables.selectable_socket import SelectableSocket
-
-
-@enum.unique
-class TCPClientSocketState(enum.StrEnum):
-    # TCP clients state
-    ACCEPTED = "accepted"  # Progress after greeting is added to send queue
-    PENDING_GREETING_TRANSMISSION = "pending_greeting_transmissions"
-    PENDING_GREETING_ACK = "pending_greeting_ack"  # progress after greeting was sent
-    GREETING_ACKWNOLEDGED = "greeting_acknoledged"  # Progress after sending connect
-    CONNECT_ACKNOLODGED = "connect_acknoledged"  #
-    TUNNELING = "tunneling"
 
 
 class TCPClientSocket(SelectableSocket):

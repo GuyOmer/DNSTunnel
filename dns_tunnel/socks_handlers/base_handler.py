@@ -49,6 +49,7 @@ class BaseHandler(abc.ABC):
 
         if msg.header.message_type == MessageType.CLOSE_SESSION:
             self._logger.info(f"Closing session {msg.header.session_id}")
+            ingress.remove_session(msg.header.session_id)
             self.remove_edge_by_session_id(msg.header.session_id)
             return
 

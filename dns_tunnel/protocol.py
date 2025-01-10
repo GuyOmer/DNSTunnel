@@ -63,7 +63,7 @@ class DNSPacketHeader:
             raise InvalidSocketBuffer(f"Buffer starts with '{data[:len(cls.MAGIC)]}', are expected '{cls.MAGIC}'")
 
         length, raw_message_type, session_id, sequence_number = cls._FORMATTER.unpack(data[: cls._FORMATTER.size])[
-            len(cls.MAGIC) :
+            len(cls.MAGIC):
         ]
         res = cls(length, MessageType(raw_message_type), session_id, sequence_number)
         return res
@@ -97,7 +97,7 @@ class DNSPacket:
 
         try:
             # TODO: assert payload not > MAX_PAYLOAD
-            payload = dns_packet_bytes[header_length : header_length + header.payload_length]
+            payload = dns_packet_bytes[header_length: header_length + header.payload_length]
         except IndexError as e:
             raise NotEnoughDataError(
                 f"Message size is  {header_length + header.payload_length} bytes, but only {len(dns_packet_bytes)} bytes are available"

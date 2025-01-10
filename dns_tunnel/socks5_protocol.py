@@ -4,8 +4,6 @@ import enum
 import struct
 from typing import Final, Self
 
-import more_itertools
-
 
 @enum.unique
 class SOCKS5AuthMethod(enum.IntEnum):
@@ -72,10 +70,6 @@ class SOCKS5Message(metaclass=abc.ABCMeta):
     @classmethod
     @abc.abstractmethod
     def from_bytes(cls, data: bytes):
-        if not data:
-            import ipdb
-
-            ipdb.set_trace()
         if int(data[0]) != SOCKS5_VERSION:
             raise ValueError("Not a SOCKS5 message")
 
@@ -103,7 +97,7 @@ class SOCKS5Greeting(SOCKS5Message):
 
         if amount_of_methods != len(methods):
             raise ValueError(
-                f"Expected {len(amount_of_methods)} auth methods, but only {len(methods)} ({', '.join(methods)}) are aviliable"
+                f"Expected {amount_of_methods} auth methods, but only {len(methods)} ({', '.join([m.name for m in methods])}) are available"
             )
 
         return cls(methods)
@@ -358,7 +352,7 @@ class SOCKS5IPv4ConnectResponse(SOCKS5Message):
             0,  # Reserved
             self.address_type,
             self.host,
-            *map(int, self.host.split(".")),  # TODO: Should this be a list, or unpacking
+            *map(int, self.host.split(".")),
             self.port,
         )
 

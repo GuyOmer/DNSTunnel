@@ -51,7 +51,7 @@ class ProxySocket(SelectableSocket):
                 return True
         return False
 
-    def add_to_write_queue(self, data: bytes, session_id: int):
+    def add_to_write_queue(self, data: bytes, session_id: int | None = None):
         session = self._sessions[session_id]
         session.sending_queue.append(
             DNSPacket(DNSPacketHeader(len(data), MessageType.NORMAL_MESSAGE, session_id, session.seq_counter), data)
@@ -110,6 +110,11 @@ class ProxySocket(SelectableSocket):
                 f"Got invalid sequence number for session {session_id}, got sequence {sequence_number} instead of {self._sessions[session_id].last_acked_seq + 1}"
             )
 
+    def remove_session(self, session_id: int):
+        logger.info(f"Removing session {session_id}")
+        if session_id in self._sessions:
+            self._sessions[session_id].is_active = False
+
     def read(self) -> list[DNSPacket]:
         # TODO: Needs to be non blocking
         data = self._s.recv(2**10)
@@ -122,7 +127,7 @@ class ProxySocket(SelectableSocket):
         while self._read_buf:
             try:
                 msg = DNSPacket.from_bytes(self._read_buf)
-                if msg.header.message_type == MessageType.ACK_MESSAGE:
+                if msg.header.message_type in [MessageType.ACK_MESSAGE, MessageType.CLOSE_SESSION]:
                     msgs.append(msg)
                 else:
                     if self._sessions[msg.header.session_id].last_seq_got + 1 == msg.header.sequence_number:
@@ -141,14 +146,10 @@ class ProxySocket(SelectableSocket):
                     )
 
                 # Consume read bytes from buffer
-                self._read_buf = self._read_buf[len(msg) :]
+                self._read_buf = self._read_buf[len(msg):]
             except InvalidSocketBuffer:  # TODO: change with dns parsing exceptions, and flush everything?
                 logger.debug("Invalid starting bytes in buffer, flushing them")
-                self._read_buf = (
-                    self._read_buf[self._read_buf.index(DNSPacketHeader.MAGIC) :]
-                    if DNSPacketHeader.MAGIC in self._read_buf
-                    else b""
-                )
+                self._read_buf = b""
                 continue
             except (PartialHeaderError, NotEnoughDataError):
                 logger.debug("Not enough data in buffer")

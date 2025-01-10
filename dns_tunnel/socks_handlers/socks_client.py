@@ -10,10 +10,13 @@ from dns_tunnel.consts import (
     PROXY_CLIENT_PORT,
     PROXY_SERVER_ADDRESS,
     PROXY_SERVER_PORT,
+    PROXY_CLIENT_SOCKS5_PORT,
 )
 from dns_tunnel.protocol import DNSPacket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 from dns_tunnel.socks_handlers.base_handler import BaseHandler
+
+CLIENTS_BACKLOG = 5
 
 # Initialize logger
 logging.basicConfig(level=logging.DEBUG, format="Client %(module)s %(levelname)s: %(message)s")
@@ -34,10 +37,9 @@ class ClientHandler(BaseHandler):
 
     def run(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # TODO: only for dev
-        server_socket.bind((PROXY_CLIENT_ADDRESS, 1080))
-        server_socket.listen(5)
-        self._logger.info("Sockets client: Server started and listening on port 1080")
+        server_socket.bind((PROXY_CLIENT_ADDRESS, PROXY_CLIENT_SOCKS5_PORT))
+        server_socket.listen(CLIENTS_BACKLOG)
+        self._logger.info(f"Sockets client: Server started and listening on port {PROXY_CLIENT_SOCKS5_PORT}")
 
         ingress_socket = self.init_ingress_socket(PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT)
         self._rlist = [server_socket]  # On startup - only listen for new server clients
@@ -59,7 +61,6 @@ class ClientHandler(BaseHandler):
             if server_socket in r_ready:
                 tcp_client, _ = server_socket.accept()
                 self._logger.info("Accepted new TCP client")
-                # tcp_client.setblocking(False) # TODO: ????
                 self._clients.append(
                     TCPClientSocket(
                         tcp_client,
