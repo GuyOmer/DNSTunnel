@@ -19,6 +19,7 @@ from dns_tunnel.socks5_protocol import (
     SOCKS5Greeting,
     SOCKS5GreetingResponse,
 )
+from dns_tunnel.socks_handlers.base_handler import BaseHandler
 
 PROXY_SERVER_ADDRESS = os.getenv("PROXY_SERVER_ADDRESS", "0.0.0.0")
 PROXY_SERVER_PORT = int(os.getenv("PROXY_SERVER_PORT", "54"))
@@ -36,21 +37,20 @@ class SOCKS5HandshakeState(enum.Enum):
     WAITING_FOR_CONNECT_REQUEST = enum.auto()
 
 
-class ProxyServerHandler:
+class ProxyServerHandler(BaseHandler):
     def __init__(self):
-        self._rlist = []
-        self._wlist = []
-
+        super().__init__()
         self._session_id_to_destination: dict[int, TCPClientSocket] = {}
         self._session_id_to_socks5_handshake_state: dict[int, SOCKS5HandshakeState] = {}
 
+    def address(self):
+        return PROXY_SERVER_ADDRESS
+
+    def port(self):
+        return PROXY_SERVER_PORT
+
     def run(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.bind(("0.0.0.0", PROXY_SERVER_PORT))
-        ingress_socket = ProxySocket(
-            s,
-            (PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT),
-        )
+        ingress_socket = self.init_ingress_socket(PROXY_CLIENT_ADDRESS, PROXY_CLIENT_PORT)
         logger.info("Proxy server started and listening for connections")
 
         while True:

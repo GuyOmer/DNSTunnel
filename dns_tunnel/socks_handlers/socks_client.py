@@ -7,8 +7,8 @@ import socket
 import more_itertools
 
 from dns_tunnel.protocol import DNSPacket, MessageType
-from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
+from dns_tunnel.socks_handlers.base_handler import BaseHandler
 
 # Initialize logger
 logging.basicConfig(level=logging.DEBUG, format="Client %(module)s %(levelname)s: %(message)s")
@@ -21,27 +21,26 @@ PROXY_CLIENT_ADDRESS = os.getenv("PROXY_CLIENT_ADDRESS", "0.0.0.0")
 PROXY_CLIENT_PORT = int(os.getenv("PROXY_CLIENT_PORT", "52"))
 
 
-class ClientHandler:
+class ClientHandler(BaseHandler):
     def __init__(self):
-        self._rlist = []
-        self._wlist = []
+        super().__init__()
         self._clients: list[TCPClientSocket] = []
-
         self._used_session_ids = set()
+
+    def address(self):
+        return PROXY_CLIENT_ADDRESS
+
+    def port(self):
+        return PROXY_CLIENT_PORT
 
     def run(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # TODO: only for dev
-        server_socket.bind(("0.0.0.0", 1080))
+        server_socket.bind((PROXY_CLIENT_ADDRESS, 1080))
         server_socket.listen(5)
         logger.info("Sockets client: Server started and listening on port 1080")
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.bind(("0.0.0.0", PROXY_CLIENT_PORT))
-        ingress_socket = ProxySocket(
-            s,
-            (PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT),
-        )
+        ingress_socket = self.init_ingress_socket(PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT)
         self._rlist = [server_socket]  # On startup - only listen for new server clients
 
         while True:
