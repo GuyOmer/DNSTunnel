@@ -108,7 +108,7 @@ class SOCKS5Greeting(SOCKS5Message):
 class SOCKS5GreetingResponse(SOCKS5Message):
     chosen_auth_method: SOCKS5AuthMethod
 
-    _FORMAT: Final = f"!{SOCKS5MessagePartFormat.VERSION}{SOCKS5MessagePartFormat.AUTH_METHOD}"
+    _FORMAT: Final[str] = f"!{SOCKS5MessagePartFormat.VERSION}{SOCKS5MessagePartFormat.AUTH_METHOD}"
 
     def to_bytes(self) -> bytes:
         return struct.pack(
@@ -133,8 +133,8 @@ class SOCKS5IPv4ConnectRequest(SOCKS5Message):
     host: bytes
     port: bytes
 
-    address_type: Final = SOCKS5AddressType.IP_V4
-    _FORMAT: Final = "!" + "".join(
+    address_type: Final[SOCKS5AddressType] = SOCKS5AddressType.IP_V4
+    _FORMAT: Final[str] = "!" + "".join(
         [
             SOCKS5MessagePartFormat.VERSION,
             SOCKS5MessagePartFormat.COMMAND_CODE,
@@ -178,9 +178,9 @@ class SOCKS5DNSConnectRequest(SOCKS5Message):
     address: str
     port: bytes
 
-    address_type: Final = SOCKS5AddressType.DOMAIN_NAME
+    address_type: Final[SOCKS5AddressType] = SOCKS5AddressType.DOMAIN_NAME
 
-    _CONNECT_REQUEST_FORMAT: Final = "!" + "".join(
+    _CONNECT_REQUEST_FORMAT: Final[str] = "!" + "".join(
         [
             SOCKS5MessagePartFormat.VERSION,
             SOCKS5MessagePartFormat.COMMAND_CODE,
@@ -332,9 +332,9 @@ class SOCKS5IPv4ConnectResponse(SOCKS5Message):
     host: str
     port: int
 
-    address_type: Final = SOCKS5AddressType.IP_V4
+    address_type: Final[SOCKS5AddressType] = SOCKS5AddressType.IP_V4
 
-    _FORMAT: Final = "!" + "".join(
+    _FORMAT: Final[str] = "!" + "".join(
         [
             SOCKS5MessagePartFormat.VERSION,
             SOCKS5MessagePartFormat.STATUS,

@@ -8,4 +8,4 @@ COPY ./dns_tunnel ./dns_tunnel
 RUN pip install -r requirements.txt
 
 ENV PYTHONPATH=/app
-CMD ["python", "-u", "/app/dns_tunnel/socks_client.py"] 
+CMD ["python", "-u", "/app/dns_tunnel/socks_handlers/socks_client.py"] 

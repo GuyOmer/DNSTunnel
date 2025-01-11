@@ -19,8 +19,7 @@ class MessageType(enum.Enum):
     CLOSE_SESSION = 3
 
 
-class DNSPacketError(Exception):
-    ...
+class DNSPacketError(Exception): ...
 
 
 class InvalidSocketBuffer(DNSPacketError):
@@ -31,8 +30,7 @@ class PartialHeaderError(DNSPacketError):
     """Raised when not enough data was read to construct an header"""
 
 
-class NotEnoughDataError(DNSPacketError):
-    ...
+class NotEnoughDataError(DNSPacketError): ...
 
 
 @dataclasses.dataclass
@@ -42,7 +40,7 @@ class DNSPacketHeader:
     session_id: int
     sequence_number: int
 
-    MAGIC: Final = b"deadbeef"
+    MAGIC: Final[bytes] = b"deadbeef"
     _HEADER_FMT = f"!{len(MAGIC)}bIBII"
     _FORMATTER = struct.Struct(_HEADER_FMT)
 
@@ -62,10 +60,11 @@ class DNSPacketHeader:
 
         if not data.startswith(cls.MAGIC):
             # data is long enough to contain the magic, but doesn't contain it
-            raise InvalidSocketBuffer(f"Buffer starts with '{data[:len(cls.MAGIC)]}', are expected '{cls.MAGIC}'")
+            raise InvalidSocketBuffer(f"Buffer starts with '{data[:len(cls.MAGIC)]!r}', are expected '{cls.MAGIC!r}'")
 
-        length, raw_message_type, session_id, sequence_number = cls._FORMATTER.unpack(
-            data[: cls._FORMATTER.size])[len(cls.MAGIC):]
+        length, raw_message_type, session_id, sequence_number = cls._FORMATTER.unpack(data[: cls._FORMATTER.size])[
+            len(cls.MAGIC) :
+        ]
         res = cls(length, MessageType(raw_message_type), session_id, sequence_number)
         return res
 
@@ -78,9 +77,7 @@ class DNSPacket:
     header: DNSPacketHeader
     payload: bytes
 
-    MAX_PAYLOAD: Final = (
-        125
-    )
+    MAX_PAYLOAD: Final = 125
 
     def to_bytes(self) -> bytes:
         raw = self.header.to_bytes() + self.payload
@@ -103,7 +100,7 @@ class DNSPacket:
                 f"but only {len(dns_packet_bytes)} bytes are available"
             )
 
-        payload = dns_packet_bytes[header_length:header_length + needed_bytes]
+        payload = dns_packet_bytes[header_length : header_length + needed_bytes]
         res = cls(header, payload)
         return res
 
@@ -118,7 +115,6 @@ def create_custom_dns_query(payload: bytes) -> bytes:
     :param payload: The custom payload to send (e.g., a 8x8 image encoded in base64).
     :return: The DNS query message.
     """
-    # NOTE: max size per record is 189 bytes?
     domain_name = "text.com."
 
     # Ensure the domain name is absolute

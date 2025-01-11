@@ -21,28 +21,21 @@ services:
     networks:
       - proxy-net
       - endpoint-net  # Can access the test endpoint
-    # volumes:
-    #   - ./server:/app/server
-    #   - ./shared:/app/shared
     environment:
       - PYTHONUNBUFFERED=1
-    # command: python -u server/server.py
+      - PROXY_CLIENT_ADDRESS=client
 
   client:
     build:
       context: .
       dockerfile: client_Dockerfile
     ports:
-      # - "${PROXY_SERVER_PORT:-1080}:1080"
       - "1080:1080"
     networks:
       - proxy-net  # Can only access dns-server
-    # volumes:
-    #   - ./client:/app/client
-    #   - ./shared:/app/shared
     environment:
       - PYTHONUNBUFFERED=1
-    # command: python -u client/client.py
+      - PROXY_SERVER_ADDRESS=dns-server
     depends_on:
       - dns-server
       - test-endpoint
