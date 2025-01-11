@@ -68,7 +68,7 @@ class ProxyServerHandler(BaseHandler):
             self.handle_read_edges(r_ready)
             self.write_wlist(w_ready)
 
-    def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket:
+    def get_edge_by_session_id(self, session_id: int) -> TCPClientSocket | None:
         return self._session_id_to_destination.get(session_id)
 
     def remove_edge_by_session_id(self, session_id: int) -> None:
@@ -76,8 +76,10 @@ class ProxyServerHandler(BaseHandler):
         self._session_id_to_destination[session_id] = None
 
     def _handle_incoming_ingress_message(self, msg: DNSPacket):
-        if (msg.header.message_type == MessageType.NORMAL_MESSAGE and
-                msg.header.session_id not in self._session_id_to_destination):
+        if (
+            msg.header.message_type == MessageType.NORMAL_MESSAGE
+            and msg.header.session_id not in self._session_id_to_destination
+        ):
             logger.debug(f"Handling incoming message for session {msg.header.session_id}")
             self._handle_socks5_handshake(msg)
             return

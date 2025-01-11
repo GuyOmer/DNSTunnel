@@ -1,0 +1,17 @@
+{
+    "version": "0.2",
+    "ignorePaths": [],
+    "dictionaryDefinitions": [],
+    "dictionaries": [],
+    "words": [
+        "DGRAM",
+        "edns",
+        "rdatatype",
+        "rlist",
+        "rrset",
+        "selectables",
+        "wlist"
+    ],
+    "ignoreWords": [],
+    "import": []
+}

@@ -6,9 +6,9 @@ import socket
 from dns_tunnel.consts import (
     PROXY_CLIENT_ADDRESS,
     PROXY_CLIENT_PORT,
+    PROXY_CLIENT_SOCKS5_PORT,
     PROXY_SERVER_ADDRESS,
     PROXY_SERVER_PORT,
-    PROXY_CLIENT_SOCKS5_PORT,
 )
 from dns_tunnel.selectables.proxy_socket import ProxySocket
 from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
@@ -22,18 +22,18 @@ logger = logging.getLogger(__name__)
 
 
 class ClientHandler(BaseHandler):
-    def __init__(self, logger: logging.Logger):
-        super().__init__(logger)
+    def __init__(self, handler_logger: logging.Logger):
+        super().__init__(handler_logger)
         self._clients: list[TCPClientSocket] = []
-        self._used_session_ids = set()
+        self._used_session_ids: set[int] = set()
         self._ingress_socket = self.init_ingress_socket(PROXY_SERVER_ADDRESS, PROXY_SERVER_PORT)
 
     @property
-    def address(self):
+    def address(self) -> str:
         return PROXY_CLIENT_ADDRESS
 
     @property
-    def port(self):
+    def port(self) -> int:
         return PROXY_CLIENT_PORT
 
     @property
@@ -41,7 +41,7 @@ class ClientHandler(BaseHandler):
         return self._ingress_socket
 
     @property
-    def edges(self):
+    def edges(self) -> list[TCPClientSocket]:
         return self._clients
 
     def run(self):
@@ -78,19 +78,28 @@ class ClientHandler(BaseHandler):
 
     def remove_edge_by_session_id(self, session_id: int):
         client = self._get_client_by_session_id(session_id)
+
+        # If client is not found, do nothing (it was already removed)
+        if not client:
+            return
+
         client.close()
         self._clients.remove(client)
 
-    def _get_client_by_session_id(self, session_id):
+    def _get_client_by_session_id(self, session_id) -> TCPClientSocket | None:
         for client in self._clients:
             if client.session_id == session_id:
                 return client
+
+        return None
 
     def _get_session_id(self) -> int:
         session_id = random.randint(0, 2**32)
         while session_id in self._used_session_ids:
             session_id = random.randint(0, 2**32)
+
         self._used_session_ids.add(session_id)
+
         return session_id
 
 

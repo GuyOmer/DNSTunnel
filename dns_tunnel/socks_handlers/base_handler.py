@@ -2,6 +2,7 @@ import abc
 import itertools
 import socket
 from logging import Logger
+
 import more_itertools
 
 from dns_tunnel.protocol import DNSPacket, MessageType
@@ -11,8 +12,8 @@ from dns_tunnel.selectables.tcp_client_socket import TCPClientSocket
 
 class BaseHandler(abc.ABC):
     def __init__(self, logger: Logger):
-        self._rlist = []
-        self._wlist = []
+        self._rlist: list = []
+        self._wlist: list = []
         self._logger = logger
 
     @abc.abstractmethod
@@ -35,10 +36,10 @@ class BaseHandler(abc.ABC):
     def edges(self) -> list[TCPClientSocket]: ...
 
     @abc.abstractmethod
-    def get_edge_by_session_id(self, session_id) -> TCPClientSocket: ...
+    def get_edge_by_session_id(self, session_id) -> TCPClientSocket | None: ...
 
     @abc.abstractmethod
-    def remove_edge_by_session_id(self, session_id: int) -> None: ...
+    def remove_edge_by_session_id(self, session_id: int): ...
 
     def init_ingress_socket(self, address: str, port: int) -> ProxySocket:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -48,7 +49,7 @@ class BaseHandler(abc.ABC):
             (address, port),
         )
 
-    def init_wlist(self) -> None:
+    def init_wlist(self):
         self._wlist = [edge for edge in self.edges if edge and edge.needs_to_write()]
         if self.ingress_socket.needs_to_write():
             self._wlist.append(self.ingress_socket)
@@ -76,12 +77,14 @@ class BaseHandler(abc.ABC):
             for chunk in more_itertools.chunked(data, DNSPacket.MAX_PAYLOAD):
                 self.ingress_socket.add_to_write_queue(bytes(chunk), read_ready_client.session_id)
 
-    def write_wlist(self, wlist: list) -> None:
-        write_ready = [ready for ready in wlist if ready and ready in itertools.chain(self.edges, [self.ingress_socket])]
+    def write_wlist(self, wlist: list):
+        write_ready = [
+            ready for ready in wlist if ready and ready in itertools.chain(self.edges, [self.ingress_socket])
+        ]
         for w in write_ready:
             w.write()
 
-    def _handle_incoming_ingress_message(self, msg: DNSPacket) -> None:
+    def _handle_incoming_ingress_message(self, msg: DNSPacket):
         self._logger.debug(f"Handling incoming message for session {msg.header.session_id}")
 
         if msg.header.message_type == MessageType.ACK_MESSAGE:
