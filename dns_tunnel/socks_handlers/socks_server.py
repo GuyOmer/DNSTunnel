@@ -109,9 +109,9 @@ class ProxyServerHandler(BaseHandler):
                 case SOCKS5HandshakeState.WAITING_FOR_CONNECT_REQUEST:
                     command_msg = SOCKS5DNSConnectRequest.from_bytes(msg.payload)
                     if command_msg.command != SOCKS5CommandCode.ESTABLISH_A_TCP_IP_STREAM_CONNECTION:
-                        logger.error(f"Only {SOCKS5CommandCode.ESTABLISH_A_TCP_IP_STREAM_CONNECTION} is supported")
+                        logger.error(f"Only {SOCKS5CommandCode.ESTABLISH_A_TCP_IP_STREAM_CONNECTION.name} is supported")
                         raise ValueError(
-                            f"Only {SOCKS5CommandCode.ESTABLISH_A_TCP_IP_STREAM_CONNECTION} is supported"
+                            f"Only {SOCKS5CommandCode.ESTABLISH_A_TCP_IP_STREAM_CONNECTION.name} is supported"
                         )
 
                     dest_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

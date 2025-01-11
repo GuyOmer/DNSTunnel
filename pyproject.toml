@@ -8,3 +8,22 @@ disable = [
 
 [tool.black]
 line-length=120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--cov=dns_tunnel --cov-report=html --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["dns_tunnel"]
+omit = ["tests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass",
+    "raise ImportError",
+]

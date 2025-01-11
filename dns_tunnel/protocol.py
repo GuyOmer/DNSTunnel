@@ -94,15 +94,16 @@ class DNSPacket:
         header = DNSPacketHeader.from_bytes(dns_packet_bytes)
 
         header_length = len(header)
+        available_bytes = len(dns_packet_bytes) - header_length
+        needed_bytes = header.payload_length
 
-        try:
-            payload = dns_packet_bytes[header_length: header_length + header.payload_length]
-        except IndexError as e:
+        if available_bytes < needed_bytes:
             raise NotEnoughDataError(
-                f"Message size is  {header_length + header.payload_length} bytes, "
+                f"Message size is {header_length + needed_bytes} bytes, "
                 f"but only {len(dns_packet_bytes)} bytes are available"
-            ) from e
+            )
 
+        payload = dns_packet_bytes[header_length:header_length + needed_bytes]
         res = cls(header, payload)
         return res
 
